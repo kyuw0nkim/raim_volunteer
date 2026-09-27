@@ -152,12 +152,8 @@ textarea:disabled{background:var(--sunk);color:var(--muted)}
 
 /* rules panel */
 .rules{background:var(--surface);border:1px solid var(--line);border-radius:10px}
-.rules summary{cursor:pointer;padding:12px 16px;font-weight:700;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;list-style:none}
-.rules summary::-webkit-details-marker{display:none}
-.rules summary::before{content:"▸";color:var(--muted);font-size:12px}
-.rules[open] summary::before{content:"▾"}
-.rules summary span{font-weight:400;font-size:12px;color:var(--muted)}
-.rules-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:4px 16px 16px}
+.rules-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:16px}
+.setfoot{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;color:var(--muted)}
 @media (max-width:900px){.rules-body{grid-template-columns:1fr}}
 .rb{display:grid;gap:8px;align-content:start}
 .rb h4{margin:0;font-size:12px;letter-spacing:.06em;color:var(--muted)}
@@ -230,6 +226,12 @@ var LIME=[],LIMESRC="board";
 function limeList(){return LIMESRC==="sheet"?LIME:ST.lime}
 function isLime(name){return limeList().indexOf(String(name).trim())>=0}
 function isRogDay(k){var d=S.days[k];if(d&&typeof d.rog==="boolean")return d.rog;return ST.rogDays.indexOf(dateOf(k).getDay())>=0}
+/* names signed up for both 오전 and 오후 on the same day */
+function allDayNames(d){
+  var am=d.vols.filter(function(v){return v.slot==="오전"}).map(function(v){return v.name});
+  var seen={};
+  return d.vols.filter(function(v){if(v.slot!=="오후"||am.indexOf(v.name)<0||seen[v.name])return false;seen[v.name]=1;return true}).map(function(v){return v.name});
+}
 function capOf(p){var c=ST.cap[p];return (c==null||c==="")?Infinity:+c}
 
 /* auto placement: dedicated 로공방 people go to 4F on 로공방 days; everyone else
@@ -417,7 +419,7 @@ window.addEventListener("beforeunload",function(e){if(saveTimer||inflight){e.pre
 function notice(k){
   var d=peek(k),head="["+md(k)+" 자원봉사자]";
   if(!d.vols.length)return head+"\n\n- 봉사자 없음";
-  var out=[head,""];var limeSlots=[];
+  var out=[head,""];var limeSlots=[];var allDay=allDayNames(d);
   SLOTS.forEach(function(s,i){
     out.push((i+1)+") "+s);
     var vs=d.vols.filter(function(v){return v.slot===s});
@@ -425,13 +427,14 @@ function notice(k){
     PORDER.forEach(function(p){
       var g=vs.filter(function(v){return v.place===p});
       if(!g.length)return;
-      var names=g.map(function(v){return v.name+(isLime(v.name)?"(라메)":"")}).join("/");
+      var names=g.map(function(v){return v.name+(isLime(v.name)?"(라메)":"")+(allDay.indexOf(v.name)>=0?"(종일)":"")}).join("/");
       var memo=g.filter(function(v){return v.memo}).map(function(v){return v.memo}).join(", ");
       out.push("- "+names+": "+PLACES[p]+(memo?" (*"+memo+")":""));
     });
     if(vs.some(function(v){return isLime(v.name)}))limeSlots.push(s==="오전"?"오전 9시 30분":"오후 13시 30분");
     out.push("");
   });
+  if(allDay.length)out.push("*"+allDay.join("/")+" 종일봉사자 > 점심시간 1~2시 (*단기 협의)");
   (d.note||"").split("\n").forEach(function(l){l=l.trim();if(l)out.push(l.charAt(0)==="*"?l:"*"+l)});
   if(limeSlots.length){out.push("*장기 [라임 메이트] 봉사자 활동; "+limeSlots.join(", "));out.push("   (약 30분간 운영요원실 환복장소로 사용)")}
   out.push("*자원봉사 활동 용지에 활동 내용을 반드시 작성하도록 확인 부탁드립니다.");
@@ -460,7 +463,14 @@ var armed=null;
 function render(){
   var T=todo();
   var h='';
-  h+='<header class="top"><h1>RAIM 자원봉사 보드<small>1365 명단 확인 · 출석 · 실적 입력을 한곳에서</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="linkbtn" data-act="setup">연결 설정</button></div></header>';
+  if(UI.view==="settings"){
+    h+='<header class="top"><h1>설정<small>배치 규칙 · 라메 명단</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="board">← 보드로</button></div></header>';
+    if(saveState==="conflict")h+='<div class="banner">다른 기기나 창에서 먼저 저장했어요. ‘최신 내용 불러오기’를 누른 뒤 다시 입력해 주세요. 방금 바꾼 내용은 저장되지 않았어요.</div>';
+    h+=rulesHTML();
+    h+='<div class="setfoot"><span>웹앱 주소·접속 코드를 바꾸려면</span><button type="button" class="btn" data-act="setup">연결 설정</button></div>';
+    document.getElementById("app").innerHTML=h;return;
+  }
+  h+='<header class="top"><h1>RAIM 자원봉사 보드<small>1365 명단 확인 · 출석 · 실적 입력을 한곳에서</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="settings" title="배치 규칙 · 라메 명단">설정</button></div></header>';
   if(saveState==="conflict")h+='<div class="banner">다른 기기나 창에서 먼저 저장했어요. ‘최신 내용 불러오기’를 누른 뒤 다시 입력해 주세요. 방금 바꾼 내용은 저장되지 않았어요.</div>';
 
   // lanes
@@ -484,20 +494,19 @@ function render(){
     h+='</div>'});h+='</div>'}
   h+='</div></section>';
 
-  h+=rulesHTML();
   h+='<section class="main">'+calHTML()+detailHTML()+'</section>';
   var app=document.getElementById("app");app.innerHTML=h;
 }
 
 function rulesHTML(){
-  var h='<details class="rules" id="rules"'+(UI.rulesOpen?" open":"")+'><summary>배치 규칙 · 라메 명단<span>라메 '+limeList().length+'명 · 로공방 있는 날 '+ST.prioRog.map(short).join(" > ")+' · 없는 날 '+ST.prioNo.map(short).join(" > ")+'</span></summary><div class="rules-body">';
+  var h='<section class="rules" aria-label="배치 규칙 · 라메 명단"><div class="rules-body">';
   if(LIMESRC==="sheet")h+='<div class="rb"><h4>라메 명단</h4><p>시트의 ‘라임메이트’ 탭에서 불러왔어요. 추가·삭제는 시트에서 하면 다음에 열 때 반영돼요.</p><textarea id="lime-list" disabled aria-label="라메 명단">'+esc(LIME.join("\n"))+'</textarea></div>';
   else h+='<div class="rb"><h4>라메 명단</h4><p>시트에 ‘라임메이트’ 탭이 없어서 여기서 관리해요. 이름과 똑같은 봉사자는 자동으로 (라메)로 표기돼요.</p><textarea id="lime-list" data-act="limelist" aria-label="라메 명단">'+esc(ST.lime.join("\n"))+'</textarea></div>';
   h+='<div class="rb"><h4>배치 우선순위</h4><p>위에서부터 한 명씩 돌아가며 채우고, 최대 인원이 찬 구역은 건너뛰어요.</p><div class="prio">'+prioList("prioRog","로공방 있는 날")+prioList("prioNo","로공방 없는 날")+'</div></div>';
   h+='<div class="rb"><h4>구역별 최대 인원</h4><div class="caps">'+["1F","2F","3F","4F"].map(function(p){var c=ST.cap[p];return '<label for="cap-'+p+'">'+PLACES[p].split(" ").slice(0,2).join(" ")+'<input type="number" min="0" inputmode="numeric" id="cap-'+p+'" data-act="cap" data-p="'+p+'" value="'+(c==null?"":c)+'" placeholder="제한 없음"></label>'}).join("")+'</div>';
   h+='<h4>로공방 운영 요일</h4><div class="wdays">'+WD.map(function(w,i){var on=ST.rogDays.indexOf(i)>=0;return '<label class="'+(on?"on":"")+'"><input type="checkbox" data-act="rogday" data-w="'+i+'"'+(on?" checked":"")+'> '+w+'</label>'}).join("")+'</div>';
   h+='<p>로공방 모집 봉사자는 로공방 운영일에 항상 로공방으로 가요. 날짜별로 운영 여부를 따로 바꿀 수도 있어요. 규칙을 바꾸면 오늘 이후 자동 배치된 사람에게 바로 반영돼요.</p></div>';
-  return h+'</div></details>';
+  return h+'</div></section>';
 }
 function short(p){return {"1F":"1층","2F":"2층","3F":"3층","4F":"로공방","-":"미정"}[p]}
 function prioList(key,label){
@@ -527,7 +536,7 @@ function detailHTML(){
   if(!closed)h+='<label class="tg '+(d.checked?"on":"warn")+'"><input type="checkbox" data-act="checked"'+(d.checked?" checked":"")+'> 1365에서 명단 확인함</label>';
   h+='<label class="tg"><input type="checkbox" data-act="closed"'+(closed?" checked":"")+'> 휴관일</label></div>';
   if(closed){return h+'<div class="closedmsg">휴관일이에요. 운영하는 날이면 체크를 풀어 주세요.</div></div>'}
-  var rog=isRogDay(k);
+  var rog=isRogDay(k),allDay=allDayNames(d);
   h+=qeHTML(k);
   h+='<div class="dayrule"><label class="rogtg'+(rog?" on":"")+'"><input type="checkbox" data-act="dayrog"'+(rog?" checked":"")+'> 이 날 로공방 운영</label><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(d.vols.length?'<button type="button" class="btn" data-act="reauto">고정 풀고 전체 자동 배치</button>':'')+'</div>';
 
@@ -539,7 +548,7 @@ function detailHTML(){
     if(!vs.length)h+='<div class="none">봉사자 없음</div>';
     vs.forEach(function(v){
       h+='<div class="row'+(v.attend==="x"?" absent":"")+'">';
-      h+='<div class="f-name"><input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">'+(isLime(v.name)?'<span class="badge">라메</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+'</div>';
+      h+='<div class="f-name"><input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">'+(isLime(v.name)?'<span class="badge">라메</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+'</div>';
       h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+'>'+PLACES[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button></div>';
       h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방 모집</label>';
       h+='<span class="seg f-att" role="group" aria-label="출석"><button type="button" class="o'+(v.attend==="o"?" on":"")+'" data-act="att" data-v="o" data-id="'+v.id+'" aria-pressed="'+(v.attend==="o")+'">출석</button><button type="button" class="x'+(v.attend==="x"?" on":"")+'" data-act="att" data-v="x" data-id="'+v.id+'" aria-pressed="'+(v.attend==="x")+'">결석</button></span>';
@@ -552,7 +561,7 @@ function detailHTML(){
     h+='</div></div>';
   });
 
-  h+='<div class="two"><div class="field"><label for="note">공지 추가 문구 <span style="font-weight:400">(한 줄에 하나, 앞에 * 자동)</span></label><textarea id="note" data-act="note" placeholder="예: 홍자윤 종일봉사자 > 점심시간 12시~1시">'+esc(d.note||"")+'</textarea></div>';
+  h+='<div class="two"><div class="field"><label for="note">공지 추가 문구 <span style="font-weight:400">(한 줄에 하나, 앞에 * 자동)</span></label><textarea id="note" data-act="note" placeholder="예: 오후 단체 관람 있음 (종일봉사자 점심시간 문구는 자동으로 들어가요)">'+esc(d.note||"")+'</textarea></div>';
   h+='<div class="field"><div class="nh"><span class="lb">공지문</span><button type="button" class="btn primary" data-act="copy" id="copybtn">복사</button></div><pre class="notice" id="notice">'+esc(notice(k))+'</pre></div></div>';
   return h+'</div>';
 }
@@ -567,6 +576,7 @@ app.addEventListener("click",function(e){
   if(a!=="del"&&armed){armed=null}
   if(a==="sel"){UI.sel=t.dataset.k;keepUI();render();return}
   if(a==="go"){go(t.dataset.k);return}
+  if(a==="view"){UI.view=t.dataset.v;keepUI();render();window.scrollTo(0,0);return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
   if(a==="savenow"){save();return}
   if(a==="reload"){saveState="idle";load();return}
@@ -620,7 +630,6 @@ app.addEventListener("submit",function(e){
   var f=document.getElementById("add-name");if(f)f.focus();
 });
 
-app.addEventListener("toggle",function(e){if(e.target.id==="rules"){UI.rulesOpen=e.target.open;keepUI()}},true);
 app.addEventListener("submit",function(e){
   if(e.target.id!=="setupform")return;e.preventDefault();
   API={url:document.getElementById("su-url").value.trim(),token:document.getElementById("su-token").value.trim()};
