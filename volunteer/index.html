@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>RAIM 자원봉사 보드</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"><style id="app-style">
+<title>RAIM 자원봉사 보드</title>
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<style id="app-style">
 :root{color-scheme:light;
   --bg:#F4F6FA;--surface:#FFFFFF;--sunk:#E9EDF4;--ink:#16203A;--muted:#5C6780;--line:#D9DFEA;
   --accent:#2450D6;--accent-ink:#FFFFFF;--accent-soft:#E4EAFB;
@@ -380,15 +385,19 @@ var restoreY=null;try{restoreY=+sessionStorage.getItem("raim-scroll");sessionSto
 
 /* ---------- sync with the Google Sheet (Apps Script web app) ---------- */
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false;
+var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false;
+/* the last copy is kept in this browser so the board opens instantly; the sheet is checked right after */
+var CACHEKEY="raim-cache";
+function readCache(){try{var c=JSON.parse(localStorage.getItem(CACHEKEY)||"null");if(c&&API&&c.url===API.url&&c.state)return c}catch(e){}return null}
+function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,lime:LIME,dirty:DIRTY}))}catch(e){}}
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function saveHTML(){
-  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"다른 기기에서 먼저 저장됐어요",loading:"불러오는 중…"}[saveState]||"";
-  var btn=(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':saveState==="conflict"?' <button type="button" data-act="reload">최신 내용 불러오기</button>':"";
-  var s=saveState==="conflict"?"error":saveState==="loading"?"saving":saveState;
+  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"다른 기기에서 먼저 저장됐어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
+  var btn=(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':(saveState==="conflict"||saveState==="newer")?' <button type="button" data-act="reload">최신 내용 불러오기</button>':saveState==="offline"?' <button type="button" data-act="reload">다시 시도</button>':"";
+  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",newer:"pending"}[saveState]||saveState;
   return '<span class="save" id="save" data-s="'+s+'" role="status"><i></i>'+t+btn+'</span>';
 }
-function touch(){if(saveState==="conflict")return;setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1500)}
+function touch(){if(saveState==="conflict")return;DIRTY=true;writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
 function save(){
   clearTimeout(saveTimer);saveTimer=null;
   if(!API||!loaded||saveState==="conflict")return;
@@ -397,27 +406,38 @@ function save(){
   fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API.token,action:"save",baseVersion:VERSION,state:S})})
   .then(function(r){return r.json()}).then(function(res){
     inflight=false;
-    if(res&&res.ok){VERSION=res.version;if(again){again=false;save()}else if(!saveTimer)setSave("idle");return}
+    if(res&&res.ok){VERSION=res.version;if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
     again=false;
     if(res&&res.code==="conflict"){setSave("conflict");return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
     setSave("error");
   },function(){inflight=false;setSave("error")});
 }
-function load(silent){
+function typing(){var a=document.activeElement;return !!(a&&a.closest&&a.closest("#app")&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
+function applyServer(res){initState(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=false;writeCache()}
+/* bg=true: quiet check in the background (the page is already showing the saved copy) */
+function load(bg){
   if(!API){showSetup();return}
-  if(!silent&&loaded)setSave("loading");
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token);
+  if(!bg&&loaded)setSave("loading");
+  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(bg&&loaded?"&v="+VERSION:"");
   fetch(u).then(function(r){return r.json()}).then(function(res){
+    if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(!res||!res.ok){
-      if(silent&&loaded)return;
-      showSetup(res&&res.code==="auth"?"접속 코드가 맞지 않아요.":"불러오지 못했어요: "+((res&&res.message)||"알 수 없는 오류"));return;
+      if(loaded){setSave(bg?(saveState==="checking"?"offline":saveState):"error");return}
+      showSetup("불러오지 못했어요: "+((res&&res.message)||"알 수 없는 오류"));return;
     }
-    if(silent&&loaded&&res.version===VERSION)return;
-    initState(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;
-    saveState="idle";render();
+    if(bg&&loaded){
+      var sameVer=res.same||res.version===VERSION;
+      var limeChanged=JSON.stringify(res.lime||[])!==JSON.stringify(LIME);
+      if(DIRTY||saveTimer||inflight){if(!sameVer)setSave("conflict");else if(saveState==="checking")setSave("idle");return}
+      if(sameVer&&!limeChanged){if(saveState==="checking")setSave("idle");return}
+      if(typing()){setSave("newer");return}
+      if(sameVer){LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";writeCache();saveState="idle";render();return}
+    }
+    if(res.same){load(false);return}
+    applyServer(res);saveState="idle";render();
   },function(){
-    if(loaded){if(!silent)setSave("error");return}
+    if(loaded){setSave(bg?"offline":"error");return}
     showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
@@ -428,7 +448,7 @@ function showSetup(msg){
 }
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="hidden"&&saveTimer)save();
-  if(document.visibilityState==="visible"&&loaded&&!saveTimer&&!inflight&&saveState!=="conflict")load(true);
+  if(document.visibilityState==="visible"&&loaded&&!saveTimer&&!inflight&&saveState!=="conflict"){if(saveState==="idle")setSave("checking");load(true)}
 });
 window.addEventListener("beforeunload",function(e){if(saveTimer||inflight){e.preventDefault();e.returnValue=""}});
 
@@ -657,7 +677,7 @@ app.addEventListener("click",function(e){
   if(a==="report"){var ri=document.getElementById("rym");if(ri&&ri.value)downloadReport(ri.value);return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
   if(a==="savenow"){save();return}
-  if(a==="reload"){saveState="idle";load();return}
+  if(a==="reload"){if(saveState==="offline"&&DIRTY){saveState="pending";save();return}saveState="idle";load(false);return}
   if(a==="setup"){if(saveTimer)save();showSetup();return}
   if(a==="qeapply"){doApply();return}
   if(a==="pin"){var vp=findVol(t.dataset.id);if(!vp)return;vp.locked=!vp.locked;autoAssign(UI.sel);touch();render();return}
@@ -716,7 +736,13 @@ app.addEventListener("submit",function(e){
   document.getElementById("app").innerHTML='<p class="boot">불러오는 중…</p>';
   load();
 });
-load();
+(function boot(){
+  var c=API&&readCache();
+  if(!c){load(false);return}
+  initState(c.state);VERSION=c.version||0;LIME=c.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=!!c.dirty;
+  saveState=DIRTY?"pending":"checking";render();
+  if(DIRTY)save();else load(true);
+})();
 })();
 </script>
 </body>

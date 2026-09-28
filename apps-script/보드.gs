@@ -42,22 +42,34 @@ function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
     if (!보드_인증_(p.token)) return 보드_json_({ ok: false, code: 'auth' });
+    // 보드가 가진 판(v)과 같으면 내용 없이 same 만 돌려줍니다. 가장 흔하고 가장 빠른 경우예요.
     if (p.action === 'load' && p.board === 'atelier') {
+      const version = 아뜰리에_버전_();
+      const closedVersion = 보드_버전_();   // 휴관 정보는 자원봉사 보드 데이터에서 옵니다
+      if (p.v !== undefined && Number(p.v) === version && Number(p.cv) === closedVersion) {
+        return 보드_json_({ ok: true, board: 'atelier', version, closedVersion, same: true });
+      }
       return 보드_json_({
         ok: true,
         board: 'atelier',
-        version: 아뜰리에_버전_(),
-        state: 아뜰리에_불러오기_(),
-        closed: 아뜰리에_휴관지정_(),
+        version,
+        closedVersion,
+        state: 보드_캐시_('ATELIER', version, 아뜰리에_불러오기_),
+        closed: 보드_캐시_('CLOSED', closedVersion, 아뜰리에_휴관지정_),
       });
     }
     if (p.action === 'load') {
+      const version = 보드_버전_();
+      const lime = 보드_라메명단_캐시_();
+      if (p.v !== undefined && Number(p.v) === version) {
+        return 보드_json_({ ok: true, board: 'volunteer', version, same: true, lime });
+      }
       return 보드_json_({
         ok: true,
         board: 'volunteer',
-        version: 보드_버전_(),
-        state: 보드_불러오기_(),
-        lime: 보드_라메명단_(),
+        version,
+        state: 보드_캐시_('BOARD', version, 보드_불러오기_),
+        lime,
       });
     }
     return 보드_json_({ ok: false, code: 'bad_request' });
@@ -108,6 +120,61 @@ function 보드_인증_(token) {
 
 function 보드_버전_() {
   return Number(PropertiesService.getScriptProperties().getProperty('BOARD_VERSION') || 0);
+}
+
+/* =====================================================
+ * 캐시: 판(version)이 바뀌지 않았으면 시트를 다시 읽지 않습니다.
+ * 저장하면 판이 올라가서 다음 불러오기 때 한 번 새로 읽어요.
+ * ===================================================== */
+
+const 보드_캐시조각 = 30000;   // 한글 기준 값 하나가 100KB를 넘지 않게 나눠 저장
+
+function 보드_캐시_(name, version, read) {
+  const cache = CacheService.getScriptCache();
+  try {
+    const meta = JSON.parse(cache.get(name + '_META') || 'null');
+    if (meta && meta.version === version) {
+      const keys = [];
+      for (let i = 0; i < meta.n; i += 1) keys.push(name + '_' + i);
+      const parts = cache.getAll(keys);
+      if (keys.every(k => parts[k] != null)) return JSON.parse(keys.map(k => parts[k]).join(''));
+    }
+  } catch (err) {}
+  const value = read();
+  try {
+    const s = JSON.stringify(value);
+    const n = Math.ceil(s.length / 보드_캐시조각) || 1;
+    const obj = {};
+    obj[name + '_META'] = JSON.stringify({ version, n });
+    for (let i = 0; i < n; i += 1) obj[name + '_' + i] = s.slice(i * 보드_캐시조각, (i + 1) * 보드_캐시조각);
+    cache.putAll(obj, 21600);
+  } catch (err) {}
+  return value;
+}
+
+/** 라메 명단은 10분 동안 캐시합니다. 라임메이트 탭을 고친 뒤 바로 보려면 보드_캐시비우기 실행 */
+function 보드_라메명단_캐시_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('BOARD_LIME');
+  if (hit) {
+    try { return JSON.parse(hit); } catch (err) {}
+  }
+  const lime = 보드_라메명단_();
+  try { cache.put('BOARD_LIME', JSON.stringify(lime), 600); } catch (err) {}
+  return lime;
+}
+
+/**
+ * 시트의 보드_·아뜰리에_·라임메이트 탭을 직접 고쳤을 때 실행하세요.
+ * 판을 올려서, 열려 있는 보드들이 시트 내용을 다시 읽게 합니다.
+ */
+function 보드_캐시비우기() {
+  CacheService.getScriptCache().removeAll(['BOARD_META', 'ATELIER_META', 'CLOSED_META', 'BOARD_LIME']);
+  const props = PropertiesService.getScriptProperties();
+  ['BOARD_VERSION', 'ATELIER_VERSION'].forEach(k => {
+    props.setProperty(k, String(Number(props.getProperty(k) || 0) + 1));
+  });
+  Logger.log('캐시를 비웠어요. 보드를 새로고침하면 시트 내용이 보여요.');
 }
 
 /* =====================================================

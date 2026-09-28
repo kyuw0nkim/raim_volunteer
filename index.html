@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>RAIM 업무 대시보드</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"><style>
+<title>RAIM 업무 대시보드</title>
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<style>
 :root{color-scheme:light;
   --bg:#F4F6FA;--surface:#FFFFFF;--sunk:#E9EDF4;--ink:#16203A;--muted:#5C6780;--line:#D9DFEA;
   --accent:#2450D6;--accent-ink:#FFFFFF;--accent-soft:#E4EAFB;
@@ -68,8 +73,8 @@ function num(v){return v===""||v==null||isNaN(+v)?null:+v}
 var TODAY=keyOf(new Date());
 
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-function get(board){
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(board?"&board="+board:"");
+function get(board,extra){
+  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(board?"&board="+board:"")+(extra||"");
   return fetch(u).then(function(r){return r.json()}).catch(function(){return {ok:false,code:"net"}});
 }
 
@@ -146,9 +151,25 @@ function showSetup(msg){
   var a=API||{url:"",token:""};
   document.getElementById("app").innerHTML='<div class="setup"><h1>RAIM 업무 대시보드 연결</h1><p>구글 시트에 배포한 웹앱 주소와 접속 코드를 넣어주세요. 이 브라우저에만 저장되고, 자원봉사·아뜰리에 보드에도 같이 적용돼요.</p>'+(msg?'<div class="banner">'+esc(msg)+'</div>':'')+'<form id="setupform" class="setup-f" autocomplete="off"><label for="su-url">웹앱 주소</label><input id="su-url" type="url" required placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(a.url)+'"><label for="su-token">접속 코드</label><input id="su-token" type="text" required value="'+esc(a.token)+'"><button type="submit" class="btn">연결</button></form></div>';
 }
+/* the two boards keep their last copy in this browser; show that right away, then check the sheet */
+function readC(key){try{var c=JSON.parse(localStorage.getItem(key)||"null");if(c&&c.url===API.url&&c.state)return c}catch(e){}return null}
+function writeC(key,obj){try{var c=readC(key);if(c&&(c.dirty||(c.pending&&c.pending.length)))return;localStorage.setItem(key,JSON.stringify(obj))}catch(e){}}
 function load(){
   if(!API){showSetup();return}
-  Promise.all([get(""),get("atelier")]).then(function(r){render(r[0],r[1])});
+  var cv=readC("raim-cache"),ca=readC("raim-cache-atelier");
+  var V=cv&&{ok:true,board:"volunteer",version:cv.version,state:cv.state,lime:cv.lime};
+  var A=ca&&{ok:true,board:"atelier",version:ca.version,closedVersion:ca.closedVersion,state:ca.state,closed:ca.closed};
+  if(V&&A)render(V,A);
+  Promise.all([get("",V?"&v="+V.version:""),get("atelier",A?"&v="+A.version+"&cv="+(A.closedVersion||0):"")]).then(function(r){
+    var v=r[0],a=r[1];
+    if(v.ok&&v.same){V.lime=v.lime||V.lime;v=V}
+    else if(v.ok&&v.state)writeC("raim-cache",{url:API.url,version:v.version,state:v.state,lime:v.lime||[],dirty:false});
+    if(a.ok&&a.same)a=A;
+    else if(a.ok&&a.board==="atelier"&&a.state)writeC("raim-cache-atelier",{url:API.url,version:a.version,closedVersion:a.closedVersion||0,state:a.state,closed:a.closed||{},pending:[]});
+    if(!v.ok&&V&&v.code!=="auth")v=V;
+    if(!a.ok&&A&&a.code!=="auth")a=A;
+    render(v,a);
+  });
 }
 document.addEventListener("click",function(e){var t=e.target.closest("[data-act=setup]");if(t)showSetup()});
 document.addEventListener("submit",function(e){
