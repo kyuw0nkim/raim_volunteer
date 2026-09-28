@@ -1,0 +1,394 @@
+/**
+ * RAIM 업무 대시보드 ↔ 스프레드시트 연동 (자원봉사 보드)
+ *
+ * - GitHub Pages 보드가 이 스크립트(웹앱)를 통해 시트에 저장·불러오기를 합니다.
+ * - 라메 명단은 기존 '라임메이트' 탭에서 읽습니다.
+ * - 보드에 입력한 명단으로 '보드_활동기록입력' 탭을 만들어서,
+ *   기존 ① 이름순 / ② 첫 활동일순 활동기록부 변환이 그대로 읽을 수 있게 합니다.
+ * - 금요일 오후, 매일 저녁 메일 알림을 보냅니다.
+ * - 아뜰리에 관리 보드는 같은 웹앱·같은 접속 코드를 쓰고, 요청에 board=atelier 가 붙습니다
+ *   (처리는 아뜰리에.gs).
+ *
+ * 기존 코드와 겹치지 않도록 이 파일의 이름은 모두 '보드'로 시작합니다.
+ * 처음 한 번: 편집기에서 보드_설치 실행 → 실행 로그에서 접속 코드 확인
+ */
+
+const 보드CONFIG = {
+  기록탭명: '보드_기록',            // 보드 데이터 원본 (봉사자 한 명 = 한 줄)
+  날짜탭명: '보드_날짜',            // 날짜별 명단 확인 / 휴관 / 공지 문구
+  입력탭명: '보드_활동기록입력',     // 활동기록부 변환(①②)이 읽는 탭
+  기록부반영시작일: '20261001',      // 이 날짜부터 입력 탭에 넣습니다 (9월은 기존 탭과 겹치지 않게). 비우면 전체.
+  알림받을메일: '',                  // 비우면 스크립트 소유자 메일 (여러 명이면 쉼표로)
+  보드주소: '',                      // GitHub Pages 주소 (알림 메일에 링크로 들어감). 예: https://kyuw0nkim.github.io/raim_volunteer/
+  주말알림요일: ScriptApp.WeekDay.FRIDAY,
+  주말알림시: 15,
+  저녁알림시: 18,
+  아뜰리에알림시: 9,                 // 아뜰리에 아침 알림 (운영일만)
+};
+
+const 보드_기록헤더 = ['id', '날짜', '시간대', '봉사자', '휴대폰', '배치', '로공방모집', '고정', '출석', '1365입력', '메모'];
+const 보드_날짜헤더 = ['날짜', '명단확인', '휴관', '로공방운영', '공지추가', '확인항목'];
+// 기존 열_찾기()가 인식하는 헤더 이름 (봉사자성명 / 휴대폰 / 활동일자 / 시작시간 / 미승인)
+const 보드_입력헤더 = ['봉사자성명', '휴대폰', '활동일자', '시작시간', '미승인', '배치', '출석'];
+
+const 보드_배치라벨 = { '1F': '1층 전시안내', '2F': '2층 교육장', '3F': '3층 상주', '4F': '4층 로공방', '-': '미정' };
+const 보드_요일 = ['일', '월', '화', '수', '목', '금', '토'];
+
+/* =====================================================
+ * 웹앱 (보드가 호출)
+ * ===================================================== */
+
+function doGet(e) {
+  try {
+    const p = (e && e.parameter) || {};
+    if (!보드_인증_(p.token)) return 보드_json_({ ok: false, code: 'auth' });
+    if (p.action === 'load' && p.board === 'atelier') {
+      return 보드_json_({
+        ok: true,
+        board: 'atelier',
+        version: 아뜰리에_버전_(),
+        state: 아뜰리에_불러오기_(),
+        closed: 아뜰리에_휴관지정_(),
+      });
+    }
+    if (p.action === 'load') {
+      return 보드_json_({
+        ok: true,
+        board: 'volunteer',
+        version: 보드_버전_(),
+        state: 보드_불러오기_(),
+        lime: 보드_라메명단_(),
+      });
+    }
+    return 보드_json_({ ok: false, code: 'bad_request' });
+  } catch (err) {
+    return 보드_json_({ ok: false, code: 'error', message: String(err && err.message || err) });
+  }
+}
+
+function doPost(e) {
+  let body;
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return 보드_json_({ ok: false, code: 'bad_request' });
+  }
+  if (!보드_인증_(body.token)) return 보드_json_({ ok: false, code: 'auth' });
+  if (body.action !== 'save') return 보드_json_({ ok: false, code: 'bad_request' });
+
+  const atelier = body.board === 'atelier';
+  const versionKey = atelier ? 'ATELIER_VERSION' : 'BOARD_VERSION';
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+    const current = Number(PropertiesService.getScriptProperties().getProperty(versionKey) || 0);
+    if (Number(body.baseVersion) !== current) {
+      return 보드_json_({ ok: false, code: 'conflict', version: current });
+    }
+    if (atelier) 아뜰리에_저장_(body.state || {});
+    else 보드_저장_(body.state || {});
+    const next = current + 1;
+    PropertiesService.getScriptProperties().setProperty(versionKey, String(next));
+    return 보드_json_({ ok: true, version: next });
+  } catch (err) {
+    return 보드_json_({ ok: false, code: 'error', message: String(err && err.message || err) });
+  } finally {
+    try { lock.releaseLock(); } catch (x) {}
+  }
+}
+
+function 보드_json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function 보드_인증_(token) {
+  const saved = PropertiesService.getScriptProperties().getProperty('BOARD_TOKEN');
+  return !!saved && String(token || '') === saved;
+}
+
+function 보드_버전_() {
+  return Number(PropertiesService.getScriptProperties().getProperty('BOARD_VERSION') || 0);
+}
+
+/* =====================================================
+ * 시트 읽기 / 쓰기
+ * ===================================================== */
+
+function 보드_시트_(name, header) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function 보드_덮어쓰기_(sheet, header, rows) {
+  const width = header.length;
+  const oldRows = Math.max(sheet.getLastRow() - 1, 1);
+  sheet.getRange(2, 1, oldRows, Math.max(width, sheet.getLastColumn())).clearContent();
+  sheet.getRange(1, 1, 1, width).setValues([header]).setFontWeight('bold');
+  if (rows.length) {
+    const range = sheet.getRange(2, 1, rows.length, width);
+    range.setNumberFormat('@');   // 날짜·전화번호가 숫자로 바뀌거나 메모가 수식으로 읽히지 않게
+    range.setValues(rows);
+  }
+}
+
+function 보드_키_(value) {
+  const digits = String(value == null ? '' : value).replace(/[^0-9]/g, '');
+  return digits.length === 8 ? digits : '';
+}
+
+function 보드_배치코드_(label) {
+  const text = String(label || '').trim();
+  for (const code in 보드_배치라벨) {
+    if (보드_배치라벨[code] === text || code === text) return code;
+  }
+  return '-';
+}
+
+function 보드_불러오기_() {
+  const days = {};
+  const newDay = () => ({ checked: false, note: '', vols: [] });
+
+  const dateSheet = 보드_시트_(보드CONFIG.날짜탭명, 보드_날짜헤더);
+  dateSheet.getDataRange().getDisplayValues().slice(1).forEach(r => {
+    const k = 보드_키_(r[0]);
+    if (!k) return;
+    const d = newDay();
+    d.checked = r[1] === '1';
+    if (r[2] !== '') d.closed = r[2] === '1';
+    if (r[3] !== '') d.rog = r[3] === '1';
+    d.note = r[4] || '';
+    // 1365 공고별 확인 (예: "ex_am,ex_pm"). 비어 있으면 보드가 명단확인 값으로 채웁니다.
+    if (r[5]) {
+      d.chk = {};
+      String(r[5]).split(',').forEach(c => { c = c.trim(); if (c) d.chk[c] = true; });
+    }
+    days[k] = d;
+  });
+
+  const volSheet = 보드_시트_(보드CONFIG.기록탭명, 보드_기록헤더);
+  volSheet.getDataRange().getDisplayValues().slice(1).forEach(r => {
+    const k = 보드_키_(r[1]);
+    if (!k || !String(r[3]).trim()) return;
+    if (!days[k]) days[k] = newDay();
+    days[k].vols.push({
+      id: r[0] || Utilities.getUuid().slice(0, 7),
+      slot: r[2] === '오후' ? '오후' : '오전',
+      name: String(r[3]).trim(),
+      phone: r[4] || '',
+      place: 보드_배치코드_(r[5]),
+      rog: r[6] === '1',
+      locked: r[7] === '1',
+      attend: r[8] === '출석' ? 'o' : r[8] === '결석' ? 'x' : null,
+      entered: r[9] === '1',
+      memo: r[10] || '',
+    });
+  });
+
+  let settings = {};
+  try {
+    settings = JSON.parse(PropertiesService.getScriptProperties().getProperty('BOARD_SETTINGS') || '{}');
+  } catch (err) {}
+
+  return { v: 2, days, settings };
+}
+
+function 보드_저장_(state) {
+  const days = state.days || {};
+  const keys = Object.keys(days).filter(보드_키_).sort();
+
+  const dateRows = keys.map(k => {
+    const d = days[k] || {};
+    const tri = v => (v === true ? '1' : v === false ? '0' : '');
+    const chk = Object.keys(d.chk || {}).filter(c => d.chk[c]).join(',');
+    return [k, d.checked ? '1' : '', tri(d.closed), tri(d.rog), d.note || '', chk];
+  });
+
+  const volRows = [];
+  keys.forEach(k => {
+    (days[k].vols || []).forEach(v => {
+      volRows.push([
+        v.id || '',
+        k,
+        v.slot === '오후' ? '오후' : '오전',
+        String(v.name || '').trim(),
+        v.phone || '',
+        보드_배치라벨[v.place] || '미정',
+        v.rog ? '1' : '',
+        v.locked ? '1' : '',
+        v.attend === 'o' ? '출석' : v.attend === 'x' ? '결석' : '',
+        v.entered ? '1' : '',
+        v.memo || '',
+      ]);
+    });
+  });
+
+  보드_덮어쓰기_(보드_시트_(보드CONFIG.날짜탭명, 보드_날짜헤더), 보드_날짜헤더, dateRows);
+  보드_덮어쓰기_(보드_시트_(보드CONFIG.기록탭명, 보드_기록헤더), 보드_기록헤더, volRows);
+
+  // 활동기록부 입력 탭: 결석은 미승인=1 로 넣어서 기존 변환에서 빠지게 합니다.
+  const start = 보드_키_(보드CONFIG.기록부반영시작일);
+  const inputRows = volRows
+    .filter(r => !start || r[1] >= start)
+    .map(r => [r[3], r[4], r[1], r[2], r[8] === '결석' ? '1' : '', r[5], r[8]]);
+  보드_덮어쓰기_(보드_시트_(보드CONFIG.입력탭명, 보드_입력헤더), 보드_입력헤더, inputRows);
+
+  const settings = Object.assign({}, state.settings || {});
+  PropertiesService.getScriptProperties().setProperty('BOARD_SETTINGS', JSON.stringify(settings));
+}
+
+/** 기존 '라임메이트' 탭의 이름 열을 읽습니다. */
+function 보드_라메명단_() {
+  const tabName = (typeof CONFIG !== 'undefined' && CONFIG.라임메이트탭명) || '라임메이트';
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(tabName);
+  if (!sheet) return [];
+  const values = sheet.getDataRange().getDisplayValues();
+  const nameHeaders = ['이름', '성명', '봉사자성명', '봉사자명'];
+  for (let row = 0; row < Math.min(values.length, 20); row += 1) {
+    const col = values[row].findIndex(v => nameHeaders.includes(String(v).replace(/\s/g, '')));
+    if (col < 0) continue;
+    const names = [];
+    values.slice(row + 1).forEach(r => {
+      const n = String(r[col] || '').replace(/\s+/g, ' ').trim();
+      if (n && !names.includes(n)) names.push(n);
+    });
+    return names;
+  }
+  return [];
+}
+
+/* =====================================================
+ * 설치 · 알림
+ * ===================================================== */
+
+/** 처음 한 번 실행: 탭 만들기, 접속 코드 만들기, 알림 예약 */
+function 보드_설치() {
+  const props = PropertiesService.getScriptProperties();
+  let token = props.getProperty('BOARD_TOKEN');
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+    props.setProperty('BOARD_TOKEN', token);
+  }
+  if (!props.getProperty('BOARD_VERSION')) props.setProperty('BOARD_VERSION', '0');
+  if (!props.getProperty('ATELIER_VERSION')) props.setProperty('ATELIER_VERSION', '0');
+
+  보드_시트_(보드CONFIG.기록탭명, 보드_기록헤더);
+  보드_시트_(보드CONFIG.날짜탭명, 보드_날짜헤더);
+  보드_시트_(보드CONFIG.입력탭명, 보드_입력헤더);
+  아뜰리에_탭만들기_();
+  보드_알림설치();
+
+  Logger.log('설치 완료. 보드 접속 코드: ' + token);
+}
+
+/** 접속 코드를 새로 만듭니다 (코드가 새어 나갔을 때). 보드에서 새 코드로 다시 연결하세요. */
+function 보드_접속코드바꾸기() {
+  const token = Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+  PropertiesService.getScriptProperties().setProperty('BOARD_TOKEN', token);
+  Logger.log('새 접속 코드: ' + token);
+}
+
+function 보드_알림설치() {
+  const handlers = ['보드_알림_주말', '보드_알림_저녁', '아뜰리에_알림_아침'];
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (handlers.includes(t.getHandlerFunction())) ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('보드_알림_주말').timeBased().everyWeeks(1)
+    .onWeekDay(보드CONFIG.주말알림요일).atHour(보드CONFIG.주말알림시).create();
+  ScriptApp.newTrigger('보드_알림_저녁').timeBased().everyDays(1)
+    .atHour(보드CONFIG.저녁알림시).create();
+  ScriptApp.newTrigger('아뜰리에_알림_아침').timeBased().everyDays(1)
+    .atHour(보드CONFIG.아뜰리에알림시).create();
+}
+
+function 보드_오늘_() {
+  return Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
+}
+
+// 시간대 설정과 상관없이 날짜 계산이 맞도록 UTC로 계산합니다.
+function 보드_날짜더하기_(k, n) {
+  const d = new Date(Date.UTC(Number(k.slice(0, 4)), Number(k.slice(4, 6)) - 1, Number(k.slice(6, 8)) + n));
+  const p = x => (x < 10 ? '0' : '') + x;
+  return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate());
+}
+
+function 보드_요일_(k) {
+  return new Date(Date.UTC(Number(k.slice(0, 4)), Number(k.slice(4, 6)) - 1, Number(k.slice(6, 8)))).getUTCDay();
+}
+
+function 보드_표시_(k) {
+  return Number(k.slice(4, 6)) + '/' + Number(k.slice(6, 8)) + ' (' + 보드_요일[보드_요일_(k)] + ')';
+}
+
+function 보드_휴관인지_(days, k) {
+  const d = days[k];
+  if (d && typeof d.closed === 'boolean') return d.closed;
+  return 보드_요일_(k) === 1;
+}
+
+function 보드_미확인_(days, from, to) {
+  const out = [];
+  for (let k = from; k <= to; k = 보드_날짜더하기_(k, 1)) {
+    if (!보드_휴관인지_(days, k) && !(days[k] && days[k].checked)) out.push(k);
+  }
+  return out;
+}
+
+function 보드_메일_(subject, lines, prefix, path) {
+  const to = 보드CONFIG.알림받을메일 || Session.getEffectiveUser().getEmail();
+  const base = 보드CONFIG.보드주소 ? 보드CONFIG.보드주소.replace(/\/?$/, '/') : '';
+  const link = base ? '\n\n열기: ' + base + (path == null ? 'volunteer/' : path) : '';
+  MailApp.sendEmail(to, (prefix || '[RAIM 봉사]') + ' ' + subject, lines.join('\n') + link);
+}
+
+/** 금요일 오후: 앞으로 7일 중 1365 명단을 아직 안 본 운영일 */
+function 보드_알림_주말() {
+  const days = 보드_불러오기_().days;
+  const today = 보드_오늘_();
+  const list = 보드_미확인_(days, 보드_날짜더하기_(today, 1), 보드_날짜더하기_(today, 7));
+  if (!list.length) return;
+  보드_메일_('1365 명단 확인 필요 ' + list.length + '일', [
+    '아직 1365 명단을 확인하지 않은 운영일이에요.',
+    '',
+  ].concat(list.map(k => '- ' + 보드_표시_(k) + ([0, 6].includes(보드_요일_(k)) ? '  ← 주말' : ''))));
+}
+
+/** 매일 저녁: 오늘 출석 미표시, 1365 실적 입력 대기, 가까운 날 명단 미확인 */
+function 보드_알림_저녁() {
+  const days = 보드_불러오기_().days;
+  const today = 보드_오늘_();
+  const lines = [];
+
+  const todayVols = (days[today] && !보드_휴관인지_(days, today)) ? days[today].vols : [];
+  const noAttend = todayVols.filter(v => v.attend == null);
+  if (noAttend.length) {
+    lines.push('■ 오늘 출석 표시 안 됨 ' + noAttend.length + '명');
+    noAttend.forEach(v => lines.push('- ' + v.name + ' (' + v.slot + ')'));
+    lines.push('');
+  }
+
+  const backlog = [];
+  Object.keys(days).sort().forEach(k => {
+    if (k > today) return;
+    const n = days[k].vols.filter(v => v.attend === 'o' && !v.entered).length;
+    if (n) backlog.push('- ' + 보드_표시_(k) + ' ' + n + '명');
+  });
+  if (backlog.length) {
+    lines.push('■ 1365 실적 입력 대기');
+    lines.push.apply(lines, backlog);
+    lines.push('');
+  }
+
+  const soon = 보드_미확인_(days, 보드_날짜더하기_(today, 1), 보드_날짜더하기_(today, 2));
+  if (soon.length) {
+    lines.push('■ 이틀 안에 있는데 명단 미확인');
+    soon.forEach(k => lines.push('- ' + 보드_표시_(k)));
+  }
+
+  if (lines.length) 보드_메일_('오늘 마무리할 일', lines);
+}
