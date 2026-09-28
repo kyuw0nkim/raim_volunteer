@@ -31,10 +31,10 @@ button{cursor:pointer}
 .save button{border:0;background:none;color:var(--accent);padding:0;font-weight:500}
 
 /* to-do board */
-.todo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.todo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (max-width:860px){.todo{grid-template-columns:1fr}}
 .lane{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;align-content:start;border-top:3px solid var(--lc)}
-.lane[data-k="check"]{--lc:var(--danger)}.lane[data-k="attend"]{--lc:var(--warn)}.lane[data-k="entry"]{--lc:var(--accent)}
+.lane[data-k="attend"]{--lc:var(--warn)}.lane[data-k="entry"]{--lc:var(--accent)}
 .lane h2{margin:0;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .lane h2 b{font-family:var(--mono);font-size:20px;color:var(--lc)}
 .lane p.hint{margin:0;color:var(--muted);font-size:12px}
@@ -92,6 +92,12 @@ button{cursor:pointer}
 .tg.on{border-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
 .tg.warn{border-color:var(--danger);background:var(--danger-soft);color:var(--danger)}
 .tg input{accent-color:var(--ok);width:16px;height:16px;margin:0}
+.tg.rogon{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.tg.rogon input{accent-color:var(--accent)}
+.subs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.subs label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:7px;padding:4px 10px;background:var(--surface);color:var(--ink)}
+.subs label.on{border-color:var(--ok);background:var(--ok-soft);color:var(--ok);font-weight:500}
+.subs input{margin:0;accent-color:var(--ok);width:15px;height:15px}
 
 .slot{display:grid;gap:6px}
 .slot-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
@@ -224,13 +230,22 @@ var S,ST;
 function initState(s){
   S=s||{};if(!S.days)S.days={};if(!S.settings)S.settings={};
   Object.keys(DEF).forEach(function(k){if(S.settings[k]==null)S.settings[k]=JSON.parse(JSON.stringify(DEF[k]))});
-  Object.keys(S.days).forEach(function(k){var d=S.days[k];if(!d.vols)d.vols=[];if(d.note==null)d.note=""});
+  Object.keys(S.days).forEach(function(k){var d=S.days[k];if(!d.vols)d.vols=[];if(d.note==null)d.note="";
+    if(!d.chk||typeof d.chk!=="object"){d.chk={};if(d.checked)chkItems(k).forEach(function(c){d.chk[c.id]=true})}});
   ST=S.settings;
 }
 initState({});
 var LIME=[],LIMESRC="board";
 function limeList(){return LIMESRC==="sheet"?LIME:ST.lime}
 function isLime(name){return limeList().indexOf(String(name).trim())>=0}
+/* 1365 모집 공고별 확인: 평일은 전시안내 오전·오후, 주말은 주말 오전·오후까지.
+   전부 체크되면 그 날 ‘1365 자원봉사 확인’이 된다 */
+function chkItems(k){
+  var L=[{id:"ex_am",label:"전시안내 오전"},{id:"ex_pm",label:"전시안내 오후"}];
+  if(isWeekend(k))L.push({id:"we_am",label:"주말 오전"},{id:"we_pm",label:"주말 오후"});
+  return L;
+}
+function syncChecked(k){var d=ensure(k);d.checked=chkItems(k).every(function(c){return !!d.chk[c.id]})}
 function isRogDay(k){var d=S.days[k];if(d&&typeof d.rog==="boolean")return d.rog;return ST.rogDays.indexOf(dateOf(k).getDay())>=0}
 /* names signed up for both 오전 and 오후 on the same day */
 function allDayNames(d){
@@ -314,25 +329,19 @@ function applyBoxes(k){
     });
     cur.forEach(function(x){if(used.indexOf(x)<0){d.vols.splice(d.vols.indexOf(x),1);removed++}});
   });
-  d.checked=true;autoAssign(k);
+  autoAssign(k);
   return {added:added,removed:removed};
-}
-function nextUnchecked(k){
-  var end=keyOf(addDays(dateOf(TODAY),14));
-  for(var d=addDays(dateOf(k),1);keyOf(d)<=end;d=addDays(d,1)){var x=keyOf(d);if(!isClosed(x)&&!peek(x).checked)return x}
-  var T=todo();return T.check.filter(function(x){return x!==k})[0]||null;
 }
 var lastApply=null;
 function qeHTML(k){
-  var d=peek(k),nx=nextUnchecked(k);
+  var d=peek(k);
   var h='<div class="qe"><div class="qe-h"><h3>1365 명단 입력</h3><p>1365에서 복사해 붙여넣기만 하세요. 줄바꿈·쉼표·표 복사 모두 되고, 전화번호가 같이 있으면 함께 저장돼요. 배치는 자동이에요.</p></div><div class="qe-grid">';
   boxes(k).forEach(function(b){
     var names=boxVols(k,b).map(function(v){return v.name});
     h+='<div class="qe-box'+(b.rog?" rog":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+names.length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(names.join("\n"))+'</textarea></div>';
   });
-  h+='</div><div class="qe-act"><button type="button" class="btn primary big" data-act="qeapply">'+(d.checked?"명단 다시 반영":"이 명단으로 확인 완료")+'</button>';
-  if(nx)h+='<button type="button" class="btn big" data-act="go" data-k="'+nx+'">다음 확인할 날 '+md(nx)+' →</button>';
-  h+='<span class="muted">'+(lastApply&&lastApply.k===k?("반영했어요 · 추가 "+lastApply.added+"명, 삭제 "+lastApply.removed+"명"):"비워 두고 누르면 ‘봉사자 없음’으로 확인돼요 · Ctrl+Enter")+'</span></div></div>';
+  h+='</div><div class="qe-act"><button type="button" class="btn primary big" data-act="qeapply">'+(d.vols.length?"명단 다시 반영":"명단 반영")+'</button>';
+  h+='<span class="muted">'+(lastApply&&lastApply.k===k?("반영했어요 · 추가 "+lastApply.added+"명, 삭제 "+lastApply.removed+"명"):"1365 확인은 위 체크박스로 해요 · Ctrl+Enter")+'</span></div></div>';
   return h;
 }
 function reassignFrom(k0){Object.keys(S.days).forEach(function(k){if(k>=k0)autoAssign(k)})}
@@ -347,7 +356,7 @@ function rid(){return Math.random().toString(36).slice(2,9)}
 var TODAY=keyOf(new Date());
 
 function peek(k){return S.days[k]||{checked:false,note:"",vols:[]}}
-function ensure(k){if(!S.days[k])S.days[k]={checked:false,note:"",vols:[]};return S.days[k]}
+function ensure(k){if(!S.days[k])S.days[k]={checked:false,chk:{},note:"",vols:[]};return S.days[k]}
 function isClosed(k){var d=S.days[k];if(d&&typeof d.closed==="boolean")return d.closed;return dateOf(k).getDay()===1}
 function isWeekend(k){var w=dateOf(k).getDay();return w===0||w===6}
 
@@ -453,15 +462,14 @@ function todo(){
   var keys=Object.keys(S.days).sort();
   var start=keys.length?keys[0]:TODAY;
   var end=keyOf(addDays(dateOf(TODAY),7));
-  var check=[],attend=[],entry=[];
+  var attend=[],entry=[];
   for(var d=dateOf(start);keyOf(d)<=end;d=addDays(d,1)){
     var k=keyOf(d);if(isClosed(k))continue;var day=peek(k);
-    if(!day.checked)check.push(k);
     if(k<=TODAY)day.vols.forEach(function(v){if(v.attend==null)attend.push([k,v])});
     var pend=day.vols.filter(function(v){return v.attend==="o"&&!v.entered});
     if(pend.length)entry.push([k,pend]);
   }
-  return {check:check,attend:attend,entry:entry};
+  return {attend:attend,entry:entry};
 }
 
 /* ---------- render ---------- */
@@ -482,11 +490,6 @@ function render(){
 
   // lanes
   h+='<section class="todo" aria-label="할 일">';
-  h+='<div class="lane" data-k="check"><h2>1365 명단 확인 필요<b>'+T.check.length+'</b></h2><p class="hint">지난 날짜와 앞으로 7일 중 아직 명단을 안 본 운영일</p>';
-  if(!T.check.length)h+='<div class="empty">모두 확인했어요.</div>';
-  else{h+='<div class="chips">'+T.check.map(function(k){var past=k<TODAY;return '<button type="button" class="chip'+(isWeekend(k)&&!past?" we":"")+'" data-act="go" data-k="'+k+'">'+md(k)+(past?' <span class="tag">지난 날</span>':k===TODAY?' <span class="tag">오늘</span>':isWeekend(k)?' <span class="tag">주말</span>':'')+'</button>'}).join("")+'</div>'}
-  h+='</div>';
-
   h+='<div class="lane" data-k="attend"><h2>출석 표시 필요<b>'+T.attend.length+'</b></h2><p class="hint">오늘까지 출석/결석이 비어 있는 봉사자</p>';
   if(!T.attend.length)h+='<div class="empty">비어 있는 출석이 없어요.</div>';
   else h+='<div class="attend-row">'+T.attend.map(function(a){return '<button type="button" class="chip" data-act="go" data-k="'+a[0]+'"><span class="mono">'+md(a[0])+'</span> '+esc(a[1].name)+' · '+a[1].slot+'</button>'}).join("")+'</div>';
@@ -597,13 +600,18 @@ function calHTML(){
 function detailHTML(){
   var k=UI.sel,d=peek(k),st=status(k),closed=isClosed(k);
   var h='<div class="detail"><div class="dh"><h2>'+(+k.slice(4,6))+'월 '+(+k.slice(6,8))+'일 ('+WD[dateOf(k).getDay()]+')</h2><span class="code mono">'+k+'</span><span class="pill '+st+'">'+STLABEL[st]+'</span></div>';
+  var rog=isRogDay(k),allDay=allDayNames(d);
   h+='<div class="toggles">';
-  if(!closed)h+='<label class="tg '+(d.checked?"on":"warn")+'"><input type="checkbox" data-act="checked"'+(d.checked?" checked":"")+'> 1365에서 명단 확인함</label>';
+  if(!closed){
+    h+='<label class="tg '+(d.checked?"on":"warn")+'"><input type="checkbox" data-act="checked"'+(d.checked?" checked":"")+'> 1365 자원봉사 확인</label>';
+    h+='<label class="tg'+(rog?" rogon":"")+'"><input type="checkbox" data-act="dayrog"'+(rog?" checked":"")+'> 로공방 운영일</label>';
+  }
   h+='<label class="tg"><input type="checkbox" data-act="closed"'+(closed?" checked":"")+'> 휴관일</label></div>';
   if(closed){return h+'<div class="closedmsg">휴관일이에요. 운영하는 날이면 체크를 풀어 주세요.</div></div>'}
-  var rog=isRogDay(k),allDay=allDayNames(d);
+  var dc=d.chk||{};
+  h+='<div class="subs" role="group" aria-label="1365 모집 공고별 확인">'+chkItems(k).map(function(c){var on=!!dc[c.id];return '<label class="'+(on?"on":"")+'"><input type="checkbox" data-act="subchk" data-c="'+c.id+'"'+(on?" checked":"")+'> '+c.label+'</label>'}).join("")+'</div>';
+  h+='<div class="dayrule"><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(d.vols.length?'<button type="button" class="btn" data-act="reauto">고정 풀고 전체 자동 배치</button>':'')+'</div>';
   h+=qeHTML(k);
-  h+='<div class="dayrule"><label class="rogtg'+(rog?" on":"")+'"><input type="checkbox" data-act="dayrog"'+(rog?" checked":"")+'> 이 날 로공방 운영</label><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(d.vols.length?'<button type="button" class="btn" data-act="reauto">고정 풀고 전체 자동 배치</button>':'')+'</div>';
 
   SLOTS.forEach(function(s){
     var vs=d.vols.filter(function(v){return v.slot===s});
@@ -663,7 +671,8 @@ function selectNotice(){var p=document.getElementById("notice");if(!p)return;var
 app.addEventListener("change",function(e){
   var t=e.target,a=t.dataset&&t.dataset.act;if(!a)return;
   if(a==="rym"){UI.rym=t.value;keepUI();return}
-  if(a==="checked"){ensure(UI.sel).checked=t.checked;touch();render();return}
+  if(a==="checked"){var dk=ensure(UI.sel);if(!dk.chk)dk.chk={};chkItems(UI.sel).forEach(function(c){dk.chk[c.id]=t.checked});syncChecked(UI.sel);touch();render();return}
+  if(a==="subchk"){var ds=ensure(UI.sel);if(!ds.chk)ds.chk={};ds.chk[t.dataset.c]=t.checked;syncChecked(UI.sel);touch();render();return}
   if(a==="closed"){ensure(UI.sel).closed=t.checked;touch();render();return}
   if(a==="entered"){var v=findAny(t.dataset.k,t.dataset.id);if(v){v.entered=t.checked;touch();setTimeout(render,500)}return}
   var v2=findVol(t.dataset.id);
@@ -691,7 +700,6 @@ app.addEventListener("submit",function(e){
   var d=ensure(UI.sel);
   names.forEach(function(n){d.vols.push({id:rid(),name:n,slot:slot,place:"-",rog:rogf,locked:false,attend:null,entered:false,memo:memo})});
   autoAssign(UI.sel);
-  if(!d.checked)d.checked=true;
   touch();render();
   var s=document.getElementById("add-slot");if(s)s.value=slot;
   var f=document.getElementById("add-name");if(f)f.focus();
