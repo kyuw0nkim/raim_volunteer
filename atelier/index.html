@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>아뜰리에 관리 보드</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap"><style>
+<title>아뜰리에 관리 보드</title>
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<style>
 :root{color-scheme:light;
   --bg:#F4F6FA;--surface:#FFFFFF;--sunk:#E9EDF4;--ink:#16203A;--muted:#5C6780;--line:#D9DFEA;
   --accent:#2450D6;--accent-ink:#FFFFFF;--accent-soft:#E4EAFB;
@@ -275,16 +280,20 @@ function me(force){
 
 /* ---------- sync ---------- */
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-var VERSION=0,pending=[],saveState="idle",saveTimer=null,inflight=false,loaded=false,retries=0;
+var VERSION=0,CLOSEDV=0,pending=[],saveState="idle",saveTimer=null,inflight=false,loaded=false,retries=0;
+/* the last copy (and any changes not yet saved) is kept in this browser so the board opens instantly */
+var CACHEKEY="raim-cache-atelier";
+function readCache(){try{var c=JSON.parse(localStorage.getItem(CACHEKEY)||"null");if(c&&API&&c.url===API.url&&c.state)return c}catch(e){}return null}
+function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,closedVersion:CLOSEDV,state:S,closed:CLOSED,pending:pending}))}catch(e){}}
 function saveHTML(){
-  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요"}[saveState]||"";
-  return '<span class="save" id="save" data-s="'+saveState+'" role="status"><i></i>'+t+(saveState==="error"?' <button type="button" data-act="savenow">다시 저장</button>':'')+'</span>';
+  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",checking:"최신 내용 확인 중…"}[saveState]||"";
+  return '<span class="save" id="save" data-s="'+(saveState==="checking"?"saving":saveState)+'" role="status"><i></i>'+t+(saveState==="error"?' <button type="button" data-act="savenow">다시 저장</button>':'')+'</span>';
 }
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
-function dispatch(op){apply(op);pending.push(op);setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,800);render()}
+function dispatch(op){apply(op);pending.push(op);writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,800);render()}
 function post(){return fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API.token,board:"atelier",action:"save",baseVersion:VERSION,state:S})}).then(function(r){return r.json()})}
-function fetchState(){
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&board=atelier&token="+encodeURIComponent(API.token);
+function fetchState(bg){
+  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&board=atelier&token="+encodeURIComponent(API.token)+(bg?"&v="+VERSION+"&cv="+CLOSEDV:"");
   return fetch(u).then(function(r){return r.json()});
 }
 function save(){
@@ -294,14 +303,14 @@ function save(){
   inflight=true;setSave("saving");
   var sent=pending.length;
   post().then(function(res){
-    if(res&&res.ok){inflight=false;VERSION=res.version;pending.splice(0,sent);retries=0;if(pending.length)save();else setSave("idle");return}
+    if(res&&res.ok){inflight=false;VERSION=res.version;pending.splice(0,sent);retries=0;writeCache();if(pending.length)save();else setSave("idle");return}
     if(res&&res.code==="conflict"&&retries<4){
       // someone else saved first: take their version, replay our changes on top, try again
       retries++;
       return fetchState().then(function(r2){
         inflight=false;
         if(!r2||!r2.ok||r2.board!=="atelier"){setSave("error");return}
-        norm(r2.state);CLOSED=r2.closed||{};VERSION=r2.version||0;
+        norm(r2.state);CLOSED=r2.closed||{};VERSION=r2.version||0;CLOSEDV=r2.closedVersion||0;
         pending.forEach(apply);render();save();
       });
     }
@@ -312,16 +321,19 @@ function save(){
 }
 function load(silent){
   if(!API){showSetup();return}
-  fetchState().then(function(res){
+  fetchState(silent&&loaded).then(function(res){
+    if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
+    if(silent&&loaded&&(!res||!res.ok||res.same)){if(saveState==="checking")setSave(pending.length?"pending":"idle");return}
     if(!res||!res.ok){if(silent&&loaded)return;showSetup(res&&res.code==="auth"?"접속 코드가 맞지 않아요.":"불러오지 못했어요: "+((res&&res.message)||"알 수 없는 오류"));return}
     if(res.board!=="atelier"){showSetup("웹앱이 아직 아뜰리에 보드를 모르는 버전이에요. 저장소의 apps-script 폴더 코드로 Apps Script를 바꾸고 ‘새 배포’ 해 주세요.");return}
-    if(silent&&loaded&&res.version===VERSION)return;
-    norm(res.state);CLOSED=res.closed||{};VERSION=res.version||0;loaded=true;
-    pending.forEach(apply);
+    if(silent&&loaded&&res.version===VERSION&&(res.closedVersion||0)===CLOSEDV){if(saveState==="checking")setSave("idle");return}
+    if(silent&&loaded&&pending.length)return;
+    norm(res.state);CLOSED=res.closed||{};VERSION=res.version||0;CLOSEDV=res.closedVersion||0;loaded=true;
+    pending.forEach(apply);writeCache();if(saveState==="checking")saveState="idle";
     if(!S.seeded){dispatch({t:"seed"});return}
     render();
   },function(){
-    if(loaded)return;
+    if(loaded){if(saveState==="checking")setSave("idle");return}
     showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
@@ -589,7 +601,13 @@ app.addEventListener("submit",function(e){
   if(f.id==="addissue"){var txt=document.getElementById("is-txt").value.trim();if(!txt)return;var eq=document.getElementById("is-eq").value.trim();withMe(function(who){dispatch({t:"issue",issue:{id:rid(),date:TODAY,equip:eq,text:txt,by:who,status:"진행중",doneDate:"",doneBy:"",doneNote:""}})});return}
 });
 setInterval(function(){var k=keyOf(new Date());if(k!==TODAY){TODAY=k;render()}},60000);
-load();
+(function boot(){
+  var c=API&&readCache();
+  if(!c){load();return}
+  norm(c.state);CLOSED=c.closed||{};VERSION=c.version||0;CLOSEDV=c.closedVersion||0;pending=c.pending||[];loaded=true;
+  saveState=pending.length?"pending":"checking";render();
+  if(pending.length)save();else load(true);
+})();
 })();
 </script>
 </body>
