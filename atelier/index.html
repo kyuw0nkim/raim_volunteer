@@ -368,6 +368,14 @@ function ask(o){
 
 /* ---------- sync ---------- */
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
+/* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
+(function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-act=copylink]");if(!b||!API)return;
+  var s=location.origin+location.pathname+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(API.token);
+  var manual=function(){window.prompt("이 링크를 복사해서 공유하세요. 열면 웹앱 주소·접속 코드가 자동으로 들어가요.",s)};
+  try{navigator.clipboard.writeText(s).then(function(){b.textContent="링크 복사됨 · 단톡방에 붙여넣기"},manual)}catch(x){manual()}
+});
 var VERSION=0,CLOSEDV=0,pending=[],saveState="idle",saveTimer=null,inflight=false,loaded=false,retries=0;
 /* the last copy (and any changes not yet saved) is kept in this browser so the board opens instantly */
 var CACHEKEY="raim-cache-atelier";
@@ -403,6 +411,7 @@ function save(){
       });
     }
     inflight=false;
+    if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
     setSave("error");
   }).catch(function(){inflight=false;setSave("error")});
@@ -410,6 +419,7 @@ function save(){
 function load(silent){
   if(!API){showSetup();return}
   fetchState(silent&&loaded).then(function(res){
+    if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(silent&&loaded&&(!res||!res.ok||res.same)){if(saveState==="checking")setSave(pending.length?"pending":"idle");return}
     if(!res||!res.ok){if(silent&&loaded)return;showSetup(res&&res.code==="auth"?"접속 코드가 맞지 않아요.":"불러오지 못했어요: "+((res&&res.message)||"알 수 없는 오류"));return}
@@ -425,6 +435,8 @@ function load(silent){
     showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
+/* 보드 전용 접속 코드로 다른 보드를 열었을 때 */
+function noAccess(){try{localStorage.removeItem(CACHEKEY)}catch(e){}showSetup("이 접속 코드로는 아뜰리에 관리 보드를 열 수 없어요. 이 보드용 코드나 연결 링크를 받았다면 넣어 주세요.")}
 function showSetup(msg){
   loaded=false;var a=API||{url:"",token:""};
   document.getElementById("app").innerHTML='<a class="crumb" href="../">← RAIM 업무 대시보드</a><div class="setup"><h1>아뜰리에 관리 보드 연결</h1><p>자원봉사 보드와 같은 웹앱 주소·접속 코드를 넣으면 돼요. 한 번 넣으면 이 브라우저의 다른 보드에도 같이 적용돼요.</p>'+(msg?'<div class="banner">'+esc(msg)+'</div>':'')+'<form id="setupform" class="setup-f" autocomplete="off"><label for="su-url">웹앱 주소</label><input id="su-url" type="url" required placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(a.url)+'"><label for="su-token">접속 코드</label><input id="su-token" type="text" required value="'+esc(a.token)+'"><button type="submit" class="btn primary big">연결</button></form></div>';
@@ -676,7 +688,7 @@ function settingsHTML(){
   });
   h+='</div><div class="addrow"><button type="button" class="btn" data-act="addtask">업무 추가</button></div></section>';
   h+='<section class="card"><h2>점검 항목 <small>한 줄에 하나 · 순서대로 보여요</small></h2><div class="two">'+KINDS.map(function(k){return '<label>'+k+' 점검<textarea id="cl-'+k+'" data-act="checklist" data-k="'+k+'">'+esc(checkLabels(k).join("\n"))+'</textarea></label>'}).join("")+'</div></section>';
-  h+='<section class="card"><h2>이 기기</h2><div class="addrow"><button type="button" class="btn" data-act="me">기록자 이름 바꾸기'+(ME?' ('+esc(ME)+')':'')+'</button><button type="button" class="btn" data-act="setup">연결 설정</button></div></section>';
+  h+='<section class="card"><h2>이 기기</h2><div class="addrow"><button type="button" class="btn" data-act="me">기록자 이름 바꾸기'+(ME?' ('+esc(ME)+')':'')+'</button><button type="button" class="btn" data-act="copylink">연결 링크 복사</button><button type="button" class="btn" data-act="setup">연결 설정</button></div><p class="lead">연결 링크를 단톡방 등에 올려 두면, 다른 사람은 링크를 한 번 여는 것만으로 연결돼요. 웹앱 주소가 바뀌면 새 링크를 다시 올려 주세요.</p></section>';
   return h;
 }
 

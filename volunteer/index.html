@@ -448,6 +448,14 @@ var restoreY=null;try{restoreY=+sessionStorage.getItem("raim-scroll");sessionSto
 
 /* ---------- sync with the Google Sheet (Apps Script web app) ---------- */
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
+/* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
+(function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-act=copylink]");if(!b||!API)return;
+  var s=location.origin+location.pathname+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(API.token);
+  var manual=function(){window.prompt("이 링크를 복사해서 공유하세요. 열면 웹앱 주소·접속 코드가 자동으로 들어가요.",s)};
+  try{navigator.clipboard.writeText(s).then(function(){b.textContent="링크 복사됨 · 단톡방에 붙여넣기"},manual)}catch(x){manual()}
+});
 var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false,retries=0;
 /* BASE = what the sheet had when we last loaded or saved. If someone else saves first, the sheet rejects
    our save; we then fetch their version and merge: whatever we changed since BASE wins, everything else
@@ -538,6 +546,7 @@ function save(){
     }
     inflight=false;again=false;
     if(res&&res.code==="conflict"){setSave("conflict");return}
+    if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
     setSave("error");
   }).catch(function(){inflight=false;setSave("error")});
@@ -549,6 +558,7 @@ function load(bg){
   if(!API){showSetup();return}
   if(!bg&&loaded)setSave("loading");
   fetch(loadURL(bg&&loaded)).then(function(r){return r.json()}).then(function(res){
+    if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(!res||!res.ok){
       if(loaded){setSave(bg?(saveState==="checking"?"offline":saveState):"error");return}
@@ -570,6 +580,8 @@ function load(bg){
     showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
+/* 보드 전용 접속 코드로 다른 보드를 열었을 때 */
+function noAccess(){try{localStorage.removeItem(CACHEKEY)}catch(e){}showSetup("이 접속 코드로는 자원봉사 보드를 열 수 없어요. 이 보드용 코드나 연결 링크를 받았다면 넣어 주세요.")}
 function showSetup(msg){
   loaded=false;
   var a=API||{url:"",token:""};
@@ -663,7 +675,7 @@ function paint(){
     if(saveState==="conflict")h+=CONFLICTMSG;
     h+=rulesHTML();
     h+=reportHTML();
-    h+='<div class="setfoot"><span>웹앱 주소·접속 코드를 바꾸려면</span><button type="button" class="btn" data-act="setup">연결 설정</button></div>';
+    h+='<div class="setfoot"><span>웹앱 주소·접속 코드를 바꾸려면</span><button type="button" class="btn" data-act="copylink">연결 링크 복사</button><button type="button" class="btn" data-act="setup">연결 설정</button></div>';
     document.getElementById("app").innerHTML=h;return;
   }
   h+='<a class="crumb" href="../">← RAIM 업무 대시보드</a>';

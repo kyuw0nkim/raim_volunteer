@@ -6,8 +6,8 @@
  * - 보드에 입력한 명단으로 '보드_활동기록입력' 탭을 만들어서,
  *   기존 ① 이름순 / ② 첫 활동일순 활동기록부 변환이 그대로 읽을 수 있게 합니다.
  * - 금요일 오후, 매일 저녁 메일 알림을 보냅니다.
- * - 아뜰리에 관리 보드는 같은 웹앱·같은 접속 코드를 쓰고, 요청에 board=atelier 가 붙습니다
- *   (처리는 아뜰리에.gs).
+ * - 아뜰리에 관리 보드는 같은 웹앱을 쓰고, 요청에 board=atelier 가 붙습니다 (처리는 아뜰리에.gs).
+ * - 접속 코드: 전체 코드(BOARD_TOKEN)는 두 보드 모두, 보드별 코드는 그 보드만 열 수 있습니다.
  *
  * 기존 코드와 겹치지 않도록 이 파일의 이름은 모두 '보드'로 시작합니다.
  * 처음 한 번: 편집기에서 보드_설치 실행 → 실행 로그에서 접속 코드 확인
@@ -41,7 +41,9 @@ const 보드_요일 = ['일', '월', '화', '수', '목', '금', '토'];
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
-    if (!보드_인증_(p.token)) return 보드_json_({ ok: false, code: 'auth' });
+    const perm = 보드_권한_(p.token);
+    if (!perm) return 보드_json_({ ok: false, code: 'auth' });
+    if (!perm[p.board === 'atelier' ? 'atelier' : 'volunteer']) return 보드_json_({ ok: false, code: 'forbidden' });
     // 보드가 가진 판(v)과 같으면 내용 없이 same 만 돌려줍니다. 가장 흔하고 가장 빠른 경우예요.
     if (p.action === 'load' && p.board === 'atelier') {
       const version = 아뜰리에_버전_();
@@ -85,10 +87,12 @@ function doPost(e) {
   } catch (err) {
     return 보드_json_({ ok: false, code: 'bad_request' });
   }
-  if (!보드_인증_(body.token)) return 보드_json_({ ok: false, code: 'auth' });
+  const perm = 보드_권한_(body.token);
+  if (!perm) return 보드_json_({ ok: false, code: 'auth' });
   if (body.action !== 'save') return 보드_json_({ ok: false, code: 'bad_request' });
 
   const atelier = body.board === 'atelier';
+  if (!perm[atelier ? 'atelier' : 'volunteer']) return 보드_json_({ ok: false, code: 'forbidden' });
   const versionKey = atelier ? 'ATELIER_VERSION' : 'BOARD_VERSION';
   const lock = LockService.getScriptLock();
   try {
@@ -113,9 +117,15 @@ function 보드_json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function 보드_인증_(token) {
-  const saved = PropertiesService.getScriptProperties().getProperty('BOARD_TOKEN');
-  return !!saved && String(token || '') === saved;
+/** 접속 코드로 열 수 있는 보드. 맞는 코드가 없으면 null */
+function 보드_권한_(token) {
+  const props = PropertiesService.getScriptProperties();
+  const t = String(token || '');
+  if (!t) return null;
+  if (t === props.getProperty('BOARD_TOKEN')) return { volunteer: true, atelier: true };
+  if (t === props.getProperty('VOLUNTEER_TOKEN')) return { volunteer: true };
+  if (t === props.getProperty('ATELIER_TOKEN')) return { atelier: true };
+  return null;
 }
 
 function 보드_버전_() {
@@ -353,11 +363,42 @@ function 보드_설치() {
   Logger.log('설치 완료. 보드 접속 코드: ' + token);
 }
 
-/** 접속 코드를 새로 만듭니다 (코드가 새어 나갔을 때). 보드에서 새 코드로 다시 연결하세요. */
+/** 전체 접속 코드(두 보드 모두)를 새로 만듭니다 (코드가 새어 나갔을 때). 보드에서 새 코드로 다시 연결하세요. */
 function 보드_접속코드바꾸기() {
+  보드_코드만들기_('BOARD_TOKEN', '전체(두 보드)', '');
+}
+
+/** 자원봉사 보드만 열 수 있는 코드. 다시 실행하면 새 코드로 바뀌고 예전 코드는 막힙니다. */
+function 보드_접속코드_자원봉사만() {
+  보드_코드만들기_('VOLUNTEER_TOKEN', '자원봉사 보드 전용', 'volunteer/');
+}
+
+/** 아뜰리에 관리 보드만 열 수 있는 코드. 다시 실행하면 새 코드로 바뀌고 예전 코드는 막힙니다. */
+function 보드_접속코드_아뜰리에만() {
+  보드_코드만들기_('ATELIER_TOKEN', '아뜰리에 보드 전용', 'atelier/');
+}
+
+/** 보드별 코드를 없앱니다 (그 코드로는 더 이상 못 엶). */
+function 보드_보드별코드_모두없애기() {
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty('VOLUNTEER_TOKEN');
+  props.deleteProperty('ATELIER_TOKEN');
+  Logger.log('보드별 접속 코드를 없앴어요. 전체 코드만 남아 있어요.');
+}
+
+function 보드_코드만들기_(key, label, path) {
   const token = Utilities.getUuid().replace(/-/g, '').slice(0, 10);
-  PropertiesService.getScriptProperties().setProperty('BOARD_TOKEN', token);
-  Logger.log('새 접속 코드: ' + token);
+  PropertiesService.getScriptProperties().setProperty(key, token);
+  Logger.log(label + ' 접속 코드: ' + token);
+  // 보드주소가 있으면 바로 공유할 수 있는 연결 링크도 만들어 줍니다
+  let url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (err) {}
+  if (보드CONFIG.보드주소 && /\/exec$/.test(url)) {
+    Logger.log('연결 링크: ' + 보드CONFIG.보드주소.replace(/\/?$/, '/') + path + '#c=' + encodeURIComponent(url) + '&t=' + token);
+    Logger.log('(링크의 웹앱 주소가 보드에서 쓰는 주소와 같은지 한 번 확인하세요)');
+  } else {
+    Logger.log('이 코드로 연결한 기기에서 "연결 링크 복사"를 누르면 공유용 링크가 만들어져요.');
+  }
 }
 
 function 보드_알림설치() {
