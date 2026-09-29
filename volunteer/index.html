@@ -16,6 +16,7 @@
   --canvas:#FFFFFF;--canvas-soft:#F4F8FB;--canvas-cream:#F6EFE5;
   --primary:#4AADFD;--primary-deep:#1479CC;--primary-press:#185691;--primary-soft:#81C5FE;--primary-subdued:#C3E4FD;
   --brand-dark:#152A42;--aqua:#33D1E6;--periwinkle:#9885F4;--sand:#EBAD5C;
+  --peri-soft:#ECE8FD;--peri-ink:#4B3BA8;--sand-ink:#7A4A0C;
   --ink:#0C243B;--ink-2:#2E4256;--muted:#65778B;--line:#E3E8EE;--line-input:#ADC4D7;
   --on-dark:#FFFFFF;--on-primary:#0C243B;
   --shadow-1:0 1px 3px rgba(6,58,107,.08);
@@ -138,6 +139,8 @@ button{cursor:pointer}
 .f-name{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;min-width:0}
 .f-name input.nm{flex:1 1 100%}
 .badge{font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;background:var(--accent-soft);color:var(--accent-press);white-space:nowrap}
+.badge.b-lime{background:var(--peri-soft);color:var(--peri-ink)}
+.badge.b-day{background:var(--canvas-cream);color:var(--sand-ink)}
 .f-place{display:flex;gap:6px;align-items:center;min-width:0}
 .pin{border:1px solid var(--line);background:var(--surface);border-radius:6px;font-size:11.5px;padding:4px 7px;white-space:nowrap;color:var(--muted)}
 .pin.on{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
@@ -687,7 +690,7 @@ function detailHTML(){
     if(!vs.length)h+='<div class="none">봉사자 없음</div>';
     vs.forEach(function(v){
       h+='<div class="row'+(v.attend==="x"?" absent":"")+'">';
-      h+='<div class="f-name"><input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">'+(isLime(v.name)?'<span class="badge">라메</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+'</div>';
+      h+='<div class="f-name"><input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">'+(isLime(v.name)?'<span class="badge b-lime">라메</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge b-day">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+'</div>';
       h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+'>'+PLACES[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button></div>';
       h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방 모집</label>';
       h+='<span class="seg f-att" role="group" aria-label="출석"><button type="button" class="o'+(v.attend==="o"?" on":"")+'" data-act="att" data-v="o" data-id="'+v.id+'" aria-pressed="'+(v.attend==="o")+'">출석</button><button type="button" class="x'+(v.attend==="x"?" on":"")+'" data-act="att" data-v="x" data-id="'+v.id+'" aria-pressed="'+(v.attend==="x")+'">결석</button></span>';
