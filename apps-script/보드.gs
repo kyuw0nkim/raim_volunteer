@@ -156,7 +156,13 @@ function 보드_요약_(perm, sv) {
         if (v.attend === 'o' && !v.entered) entry += 1;
       });
     });
-    out.volunteer = { closedToday, todayN: !closedToday && days[today] ? days[today].vols.length : 0, noAtt, entry };
+    const vols = !closedToday && days[today] ? days[today].vols : [];
+    out.volunteer = {
+      closedToday, todayN: vols.length, noAtt, entry,
+      am: vols.filter(v => v.slot !== '오후').length,
+      pm: vols.filter(v => v.slot === '오후').length,
+      unchecked: 보드_미확인_(days, today, 보드_날짜더하기_(today, 7)),   // 앞으로 7일 중 1365 명단 미확인 운영일
+    };
   }
   if (perm.atelier) out.atelier = 아뜰리에_요약_(today);
   return out;

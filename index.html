@@ -16,7 +16,7 @@
   --canvas:#FFFFFF;--canvas-soft:#F4F8FB;--canvas-cream:#F6EFE5;
   --primary:#4AADFD;--primary-deep:#1479CC;--primary-press:#185691;--primary-soft:#81C5FE;--primary-subdued:#C3E4FD;
   --brand-dark:#152A42;--aqua:#33D1E6;--periwinkle:#9885F4;--sand:#EBAD5C;
-  --ink:#0C243B;--ink-2:#2E4256;--muted:#65778B;--line:#E3E8EE;--line-input:#ADC4D7;
+  --ink:#0C243B;--ink-2:#2E4256;--muted:#536476;--line:#E3E8EE;--line-input:#ADC4D7;
   --on-dark:#FFFFFF;--on-primary:#0C243B;
   --shadow-1:0 1px 3px rgba(6,58,107,.08);
   --shadow-2:0 8px 24px rgba(6,58,107,.08),0 2px 6px rgba(6,58,107,.04);
@@ -103,11 +103,20 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .todo li a{display:flex;justify-content:space-between;gap:8px;width:100%;padding:6px 10px;color:inherit;text-decoration:none;border-radius:8px}
 .todo li a:hover,.stat:hover{box-shadow:inset 0 0 0 1px var(--line-input)}
 @media (max-width:640px){.setup-f input{font-size:16px}}
+/* ux pass: red = do today, orange = piling up */
+.stat.warn{background:var(--warn-soft)}.stat.warn b{color:var(--warn)}
+.todo li.soon span:last-child,.todo li.pile span:last-child{color:var(--warn);font-weight:450}
+.todo li.dim span{color:var(--muted)}
+.grp{display:grid;gap:6px}
+.grp h3{margin:0;font-size:13px;font-weight:600;color:var(--ink-2)}
+.desc,.stat span,.todo li span:last-child{font-size:13px}
+.linkbtn{font-size:13px;padding:8px 0;color:var(--ink-2)}
+.todo li a{min-height:40px;align-items:center}
 </style>
 </head>
 <body>
 <div id="app"><p class="boot">불러오는 중…</p></div>
-<script src="common.js?v=1"></script>
+<script src="common.js?v=2"></script>
 <script>
 (function(){
 "use strict";
@@ -130,24 +139,30 @@ function volHTML(s){
   var h='<section class="board"><div class="bh"><h2>자원봉사 보드</h2><a class="open" href="volunteer/">열기 →</a></div><p class="desc">1365 명단 확인 · 배치 · 출석 · 실적 입력</p>';
   h+='<div class="stats"><a class="stat" href="volunteer/"><b>'+(s.closedToday?"휴관":s.todayN)+'</b><span>오늘 봉사자</span></a>';
   h+='<a class="stat'+(s.noAtt?" hot":" good")+'" href="volunteer/"><b>'+s.noAtt+'</b><span>출석 표시 필요</span></a>';
-  h+='<a class="stat'+(s.entry?" hot":" good")+'" href="volunteer/"><b>'+s.entry+'</b><span>1365 입력 대기</span></a></div>';
-  return h+'</section>';
+  h+='<a class="stat'+(s.entry?" warn":" good")+'" href="volunteer/"><b>'+s.entry+'</b><span>1365 입력 대기</span></a></div>';
+  var g=[];
+  if(!s.closedToday&&s.am!=null)g.push(group("오늘",['<li><a href="volunteer/"><span>오전 '+s.am+'명 · 오후 '+s.pm+'명</span><span>명단 보기</span></a></li>']));
+  if(s.unchecked&&s.unchecked.length)g.push(group("1365 명단 미확인",s.unchecked.slice(0,4).map(function(k){return '<li class="'+(diff(TODAY,k)<=2?"hot":"")+'"><a href="volunteer/"><span>'+md(k)+'</span><span>'+(k===TODAY?"오늘":diff(TODAY,k)+"일 뒤")+'</span></a></li>'})));
+  return h+g.join("")+'</section>';
 }
 function atHTML(s){
   var h='<section class="board"><div class="bh"><h2>아뜰리에 관리 보드</h2><a class="open" href="atelier/">열기 →</a></div><p class="desc">할 일 · 제안 업무 · 개관/마감 점검 · 재고 · 장비 이슈</p>';
   var hot=s.todo.filter(function(t){return t.hot}).length;
   h+='<div class="stats"><a class="stat'+(hot?" hot":" good")+'" href="atelier/#today"><b>'+hot+'</b><span>오늘 할 일</span></a>';
   h+='<a class="stat'+(s.closedToday?"":s.ck<s.ckOf?"":" good")+'" href="atelier/#today"><b>'+(s.closedToday?"휴관":s.ck+"/"+s.ckOf)+'</b><span>오늘 점검</span></a>';
-  h+='<a class="stat'+(s.low.length?" hot":" good")+'" href="atelier/#stock"><b>'+s.low.length+'</b><span>재고 부족</span></a>';
-  h+='<a class="stat'+(s.issues.length?" hot":" good")+'" href="atelier/#issues"><b>'+s.issues.length+'</b><span>장비 이슈</span></a></div>';
-  var rows=s.todo.map(function(t){return '<li class="'+(t.hot?"hot":"")+'"><a href="atelier/#today"><span>'+esc(t.name)+'</span><span>'+esc(t.txt)+'</span></a></li>'})
-    .concat(s.low.map(function(i){return '<li class="hot"><a href="atelier/#stock"><span>재고: '+esc(i.name)+'</span><span>'+esc(i.qty)+esc(i.unit)+' 남음</span></a></li>'}))
-    .concat(s.issues.slice(0,3).map(function(i){return '<li><a href="atelier/#issues"><span>'+(i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text)+'</span><span>'+diff(i.date,TODAY)+'일째</span></a></li>'}));
-  if(s.issues.length>3)rows.push('<li><a href="atelier/#issues"><span>장비 이슈 '+(s.issues.length-3)+'건 더</span><span>전체 보기 →</span></a></li>');
-  if(rows.length)h+='<ul class="todo">'+rows.join("")+'</ul>';
-  return h+'</section>';
+  h+='<a class="stat'+(s.low.length?" warn":" good")+'" href="atelier/#stock"><b>'+s.low.length+'</b><span>재고 부족</span></a>';
+  h+='<a class="stat'+(s.issues.length?" warn":" good")+'" href="atelier/#issues"><b>'+s.issues.length+'</b><span>장비 이슈</span></a></div>';
+  /* grouped so 'must do today' isn't mixed with suggestions, stock and equipment */
+  var li=function(href,cls){return function(a,b){return '<li class="'+cls+'"><a href="'+href+'"><span>'+a+'</span><span>'+b+'</span></a></li>'}};
+  var todo=s.todo.filter(function(t){return t.txt!=="제안"}),sug=s.todo.filter(function(t){return t.txt==="제안"}),g=[];
+  if(todo.length)g.push(group("할 일",todo.map(function(t){return li("atelier/#today",t.hot?"hot":"soon")(esc(t.name),esc(t.txt))})));
+  if(sug.length)g.push(group("제안 업무",sug.map(function(t){return li("atelier/#today","dim")(esc(t.name),"제안")})));
+  if(s.low.length)g.push(group("재고 부족",s.low.map(function(i){return li("atelier/#stock","pile")(esc(i.name),esc(i.qty)+esc(i.unit)+" 남음")})));
+  if(s.issues.length)g.push(group("장비 이슈",s.issues.slice(0,3).map(function(i){return li("atelier/#issues","")((i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text),diff(i.date,TODAY)+"일째")}).concat(s.issues.length>3?[li("atelier/#issues","")("장비 이슈 "+(s.issues.length-3)+"건 더","전체 보기 →")]:[])));
+  return h+g.join("")+'</section>';
 }
 
+function group(title,rows){return '<div class="grp"><h3>'+title+'</h3><ul class="todo">'+rows.join("")+'</ul></div>'}
 var ERRMSG={
   old:"Apps Script를 새 버전으로 바꿔야 대시보드가 보여요. 저장소의 apps-script 폴더 코드로 바꾸고 ‘배포 관리 → 편집 → 새 버전’으로 배포해 주세요.",
   slow:"웹앱이 응답하지 않아요.",

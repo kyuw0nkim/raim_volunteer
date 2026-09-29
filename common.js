@@ -38,7 +38,7 @@ R.fetchJSON=function(url,opts,ms){
 var css=document.createElement("style");
 css.textContent='dialog.rdlg{border:0;border-radius:12px;box-shadow:0 8px 24px rgba(6,58,107,.12);padding:0;width:min(440px,calc(100vw - 32px));color:#0C243B;background:#fff}'+
   'dialog.rdlg::backdrop{background:rgba(12,36,59,.35)}.rdlg form{display:grid;gap:12px;padding:20px}.rdlg h3{margin:0;font-size:17px;font-weight:700}'+
-  '.rdlg p{margin:0;font-size:13px;color:#65778B;white-space:pre-wrap}.rdlg textarea{width:100%;min-height:96px;font:inherit;font-size:14px;padding:8px 10px;border:1px solid #ADC4D7;border-radius:6px;resize:vertical;word-break:break-all}'+
+  '.rdlg p{margin:0;font-size:13px;color:#536476;white-space:pre-wrap}.rdlg textarea{width:100%;min-height:96px;font:inherit;font-size:14px;padding:8px 10px;border:1px solid #ADC4D7;border-radius:6px;resize:vertical;word-break:break-all}'+
   '.rdlg-act{display:flex;justify-content:flex-end;gap:8px}.rdlg-act button{font:inherit;font-size:14px;border-radius:999px;padding:8px 16px;border:1px solid #4AADFD;background:#4AADFD;color:#0C243B;cursor:pointer}'+
   '.rdlg-act button.sub{background:#fff;color:#1479CC;border-color:#1479CC}@media (max-width:640px){.rdlg textarea{font-size:16px}}';
 document.head.appendChild(css);
