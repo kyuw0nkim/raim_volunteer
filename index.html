@@ -99,6 +99,10 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .todo li{border-radius:8px}
 .btn{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
 .btn:active{background:var(--primary-press);border-color:var(--primary-press);color:var(--on-dark)}
+.todo li{padding:0}
+.todo li a{display:flex;justify-content:space-between;gap:8px;width:100%;padding:6px 10px;color:inherit;text-decoration:none;border-radius:8px}
+.todo li a:hover,.stat:hover{box-shadow:inset 0 0 0 1px var(--line-input)}
+@media (max-width:640px){.setup-f input{font-size:16px}}
 </style>
 </head>
 <body>
@@ -178,9 +182,10 @@ function atHTML(res){
   h+='<a class="stat'+(s.closedToday?"":s.ck<s.ckOf?"":" good")+'" href="atelier/#today"><b>'+(s.closedToday?"휴관":s.ck+"/"+s.ckOf)+'</b><span>오늘 점검</span></a>';
   h+='<a class="stat'+(s.low.length?" hot":" good")+'" href="atelier/#stock"><b>'+s.low.length+'</b><span>재고 부족</span></a>';
   h+='<a class="stat'+(s.issues.length?" hot":" good")+'" href="atelier/#issues"><b>'+s.issues.length+'</b><span>장비 이슈</span></a></div>';
-  var rows=s.todo.map(function(t){return '<li class="'+(t.hot?"hot":"")+'"><span>'+esc(t.name)+'</span><span>'+esc(t.txt)+'</span></li>'})
-    .concat(s.low.map(function(i){return '<li class="hot"><span>재고: '+esc(i.name)+'</span><span>'+esc(i.qty)+esc(i.unit)+' 남음</span></li>'}))
-    .concat(s.issues.slice(0,3).map(function(i){return '<li><span>'+(i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text)+'</span><span>'+diff(i.date,TODAY)+'일째</span></li>'}));
+  var rows=s.todo.map(function(t){return '<li class="'+(t.hot?"hot":"")+'"><a href="atelier/#today"><span>'+esc(t.name)+'</span><span>'+esc(t.txt)+'</span></a></li>'})
+    .concat(s.low.map(function(i){return '<li class="hot"><a href="atelier/#stock"><span>재고: '+esc(i.name)+'</span><span>'+esc(i.qty)+esc(i.unit)+' 남음</span></a></li>'}))
+    .concat(s.issues.slice(0,3).map(function(i){return '<li><a href="atelier/#issues"><span>'+(i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text)+'</span><span>'+diff(i.date,TODAY)+'일째</span></a></li>'}));
+  if(s.issues.length>3)rows.push('<li><a href="atelier/#issues"><span>장비 이슈 '+(s.issues.length-3)+'건 더</span><span>전체 보기 →</span></a></li>');
   if(rows.length)h+='<ul class="todo">'+rows.join("")+'</ul>';
   return h+'</section>';
 }

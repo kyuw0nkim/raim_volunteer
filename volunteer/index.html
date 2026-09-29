@@ -265,6 +265,18 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .row,.eg label,.caps label,.prio li{border-radius:8px}
 .cell{border-radius:8px}
 .cell.sel{background:var(--primary)}
+/* usability */
+.seg button{white-space:nowrap}
+@media (min-width:981px){.row{grid-template-columns:minmax(100px,1fr) minmax(170px,1.4fr) auto auto auto minmax(80px,1fr) auto}}
+.cal-h .ttl{display:flex;align-items:center;gap:8px}
+.cal-h button.today-btn{width:auto;height:26px;padding:0 10px;font-size:12px;color:var(--accent)}
+.qe-act .muted.dirty{color:var(--warn);font-weight:600}
+@media (max-width:640px){
+  input[type=text],input[type=number],input[type=url],input[type=month],select,textarea{font-size:16px!important}
+  .seg button{padding:8px 14px}
+  .ent,.rogtg,.pin,.del{padding:8px 10px}
+  .tg,.subs label{padding:8px 12px}
+}
 </style>
 </head>
 <body>
@@ -274,6 +286,7 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 "use strict";
 var PLACES={"1F":"1층 전시 안내 및 안전관리","2F":"2층 교육장 운영지원","3F":"3층 상주 운영지원","4F":"4층 로공방 운영지원","-":"배치 미정"};
 var PORDER=["1F","2F","3F","4F","-"];
+var PSHORT={"1F":"1층 전시안내","2F":"2층 교육장","3F":"3층 상주","4F":"4층 로공방","-":"배치 미정"};
 var WD=["일","월","화","수","목","금","토"];
 var SLOTS=["오전","오후"];
 
@@ -385,15 +398,19 @@ function applyBoxes(k){
   return {added:added,removed:removed};
 }
 var lastApply=null;
+/* text pasted into the boxes but not applied yet, per day, so re-renders don't wipe it */
+var QD={};
+function qeDirty(k){return !!(QD[k]&&Object.keys(QD[k]).length)}
+function qeMsg(k){return qeDirty(k)?"반영 안 된 변경이 있어요 · ‘명단 반영’을 눌러 주세요":lastApply&&lastApply.k===k?("반영했어요 · 추가 "+lastApply.added+"명, 삭제 "+lastApply.removed+"명"):"1365 확인은 위 체크박스로 해요 · Ctrl+Enter"}
 function qeHTML(k){
   var d=peek(k);
   var h='<div class="qe"><div class="qe-h"><h3>1365 명단 입력</h3><p>1365에서 복사해 붙여넣기만 하세요. 줄바꿈·쉼표·표 복사 모두 되고, 전화번호가 같이 있으면 함께 저장돼요. 배치는 자동이에요.</p></div><div class="qe-grid">';
   boxes(k).forEach(function(b){
-    var names=boxVols(k,b).map(function(v){return v.name});
-    h+='<div class="qe-box'+(b.rog?" rog":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+names.length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(names.join("\n"))+'</textarea></div>';
+    var names=boxVols(k,b).map(function(v){return v.name}),dr=QD[k]&&QD[k][b.id],txt=dr!=null?dr:names.join("\n");
+    h+='<div class="qe-box'+(b.rog?" rog":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+parseNames(txt).length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(txt)+'</textarea></div>';
   });
   h+='</div><div class="qe-act"><button type="button" class="btn primary big" data-act="qeapply">'+(d.vols.length?"명단 다시 반영":"명단 반영")+'</button>';
-  h+='<span class="muted">'+(lastApply&&lastApply.k===k?("반영했어요 · 추가 "+lastApply.added+"명, 삭제 "+lastApply.removed+"명"):"1365 확인은 위 체크박스로 해요 · Ctrl+Enter")+'</span></div></div>';
+  h+='<span class="muted'+(qeDirty(k)?" dirty":"")+'" id="qe-msg">'+qeMsg(k)+'</span></div></div>';
   return h;
 }
 function reassignFrom(k0){Object.keys(S.days).forEach(function(k){if(k>=k0)autoAssign(k)})}
@@ -424,7 +441,8 @@ var STLABEL={closed:"휴관",check:"명단 확인 필요",attend:"출석 표시 
 
 /* ---------- UI state (per viewer) ---------- */
 var UI={sel:TODAY,vy:+TODAY.slice(0,4),vm:+TODAY.slice(4,6)-1};
-try{var u=JSON.parse(sessionStorage.getItem("raim-ui")||localStorage.getItem("raim-ui")||"null");if(u&&u.sel){UI=u}}catch(e){}
+try{var u=JSON.parse(sessionStorage.getItem("raim-ui")||"null");if(u&&u.sel){UI=u}
+  else{u=JSON.parse(localStorage.getItem("raim-ui")||"null");if(u&&u.rym)UI.rym=u.rym}}catch(e){}
 function keepUI(){try{var s=JSON.stringify(UI);localStorage.setItem("raim-ui",s);sessionStorage.setItem("raim-ui",s)}catch(e){}}
 var restoreY=null;try{restoreY=+sessionStorage.getItem("raim-scroll");sessionStorage.removeItem("raim-scroll")}catch(e){}
 
@@ -495,7 +513,7 @@ document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="hidden"&&saveTimer)save();
   if(document.visibilityState==="visible"&&loaded&&!saveTimer&&!inflight&&saveState!=="conflict"){if(saveState==="idle")setSave("checking");load(true)}
 });
-window.addEventListener("beforeunload",function(e){if(saveTimer||inflight){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",function(e){if(saveTimer||inflight||Object.keys(QD).length){e.preventDefault();e.returnValue=""}});
 
 /* ---------- notice text ---------- */
 function notice(k){
@@ -541,7 +559,35 @@ function todo(){
 
 /* ---------- render ---------- */
 var armed=null;
+/* re-rendering while a mouse/finger is down swallows the click (the element under it is replaced),
+   e.g. typing a memo and then pressing 출석. So wait until the click has gone through. */
+var ptrDown=false,deferred=false,kbd=false,ptrSeq=0,soonT=null;
+function flush(){ptrDown=false;if(deferred)render()}
+document.addEventListener("pointerdown",function(){ptrDown=true;kbd=false;ptrSeq++},true);
+document.addEventListener("pointerup",function(){var n=ptrSeq;setTimeout(function(){if(n===ptrSeq)flush()},300)},true);
+document.addEventListener("pointercancel",function(){setTimeout(flush,0)},true);
+document.addEventListener("click",function(){ptrDown=false},true);
+document.addEventListener("keydown",function(){kbd=true;ptrDown=false},true);
+/* after a change event (fires before Tab moves focus), render once focus has landed */
+function soon(){clearTimeout(soonT);soonT=setTimeout(render,0)}
+function focusKey(){
+  var a=document.activeElement,app=document.getElementById("app");if(!a||!app.contains(a))return null;
+  var field=/^(TEXTAREA|SELECT)$/.test(a.tagName)||(a.tagName==="INPUT"&&!/^(checkbox|radio)$/.test(a.type));
+  if(!field&&!kbd)return null;
+  if(a.id)return '[id="'+a.id+'"]';
+  var ds=a.dataset||{},sel="";["act","id","k","v","s","d","c","w","p","l","i"].forEach(function(n){if(ds[n]!=null)sel+='[data-'+n+'="'+String(ds[n]).replace(/"/g,"")+'"]'});
+  return sel?a.tagName.toLowerCase()+sel:null;
+}
 function render(){
+  if(ptrDown){deferred=true;return}
+  deferred=false;clearTimeout(soonT);
+  var y=window.scrollY,fk=focusKey(),el=document.querySelector(".entry-list"),es=el?el.scrollTop:0;
+  paint();
+  el=document.querySelector(".entry-list");if(el)el.scrollTop=es;
+  window.scrollTo(0,y);
+  if(fk){var f=document.querySelector(fk);if(f)try{f.focus({preventScroll:true})}catch(x){}}
+}
+function paint(){
   var T=todo();
   var h='';
   if(UI.view==="settings"){
@@ -653,7 +699,7 @@ function prioList(key,label){
 
 function calHTML(){
   var y=UI.vy,m=UI.vm,first=new Date(y,m,1),last=new Date(y,m+1,0).getDate();
-  var h='<div class="cal"><div class="cal-h"><button type="button" data-act="mon" data-d="-1" aria-label="이전 달">‹</button><strong>'+y+'년 '+(m+1)+'월</strong><button type="button" data-act="mon" data-d="1" aria-label="다음 달">›</button></div><div class="grid">';
+  var h='<div class="cal"><div class="cal-h"><button type="button" data-act="mon" data-d="-1" aria-label="이전 달">‹</button><span class="ttl"><strong>'+y+'년 '+(m+1)+'월</strong>'+(UI.sel!==TODAY||y+pad(m+1)!==TODAY.slice(0,6)?'<button type="button" class="today-btn" data-act="go" data-k="'+TODAY+'">오늘</button>':'')+'</span><button type="button" data-act="mon" data-d="1" aria-label="다음 달">›</button></div><div class="grid">';
   WD.forEach(function(w,i){h+='<div class="wd'+(i===0?" sun":i===6?" sat":"")+'">'+w+'</div>'});
   for(var i=0;i<first.getDay();i++)h+='<div class="cell pad"></div>';
   for(var dd=1;dd<=last;dd++){
@@ -677,9 +723,9 @@ function detailHTML(){
   }
   h+='<label class="tg"><input type="checkbox" data-act="closed"'+(closed?" checked":"")+'> 휴관일</label></div>';
   if(closed){return h+'<div class="closedmsg">휴관일이에요. 운영하는 날이면 체크를 풀어 주세요.</div></div>'}
-  var dc=d.chk||{};
+  var dc=d.chk||{},nLocked=d.vols.filter(function(v){return v.locked}).length;
   h+='<div class="subs" role="group" aria-label="1365 모집 공고별 확인">'+chkItems(k).map(function(c){var on=!!dc[c.id];return '<label class="'+(on?"on":"")+'"><input type="checkbox" data-act="subchk" data-c="'+c.id+'"'+(on?" checked":"")+'> '+c.label+'</label>'}).join("")+'</div>';
-  h+='<div class="dayrule"><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(d.vols.length?'<button type="button" class="btn" data-act="reauto">고정 풀고 전체 자동 배치</button>':'')+'</div>';
+  h+='<div class="dayrule"><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(nLocked?'<button type="button" class="btn" data-act="reauto">고정 '+nLocked+'명 풀고 자동 배치</button>':'')+'</div>';
   h+=qeHTML(k);
 
   SLOTS.forEach(function(s){
@@ -691,8 +737,8 @@ function detailHTML(){
     vs.forEach(function(v){
       h+='<div class="row'+(v.attend==="x"?" absent":"")+'">';
       h+='<div class="f-name"><input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">'+(isLime(v.name)?'<span class="badge b-lime">라메</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge b-day">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+'</div>';
-      h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+'>'+PLACES[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button></div>';
-      h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방 모집</label>';
+      h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+' title="'+PLACES[p]+'">'+PSHORT[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button></div>';
+      h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방</label>';
       h+='<span class="seg f-att" role="group" aria-label="출석"><button type="button" class="o'+(v.attend==="o"?" on":"")+'" data-act="att" data-v="o" data-id="'+v.id+'" aria-pressed="'+(v.attend==="o")+'">출석</button><button type="button" class="x'+(v.attend==="x"?" on":"")+'" data-act="att" data-v="x" data-id="'+v.id+'" aria-pressed="'+(v.attend==="x")+'">결석</button></span>';
       var can=v.attend==="o";
       h+='<label class="ent f-ent '+(can?(v.entered?"on":""):"off")+'"><input type="checkbox" data-act="ent" data-id="'+v.id+'"'+(v.entered?" checked":"")+(can?"":" disabled")+'> 1365 입력</label>';
@@ -710,13 +756,13 @@ function detailHTML(){
 
 function findVol(id){var d=peek(UI.sel);for(var i=0;i<d.vols.length;i++)if(d.vols[i].id===id)return d.vols[i];return null}
 function findAny(k,id){var d=S.days[k];if(!d)return null;for(var i=0;i<d.vols.length;i++)if(d.vols[i].id===id)return d.vols[i];return null}
-function go(k){UI.sel=k;UI.vy=+k.slice(0,4);UI.vm=+k.slice(4,6)-1;keepUI();armed=null;render();var el=document.querySelector(".detail");if(el&&window.innerWidth<861)el.scrollIntoView({block:"start"})}
+function go(k){UI.sel=k;UI.vy=+k.slice(0,4);UI.vm=+k.slice(4,6)-1;keepUI();armed=null;render();var el=document.querySelector(".detail");if(el&&window.innerWidth<861&&el.getBoundingClientRect().top>window.innerHeight*.5)el.scrollIntoView({block:"start",behavior:"smooth"})}
 
 var app=document.getElementById("app");
 app.addEventListener("click",function(e){
   var t=e.target.closest("[data-act]");if(!t)return;var a=t.dataset.act;
   if(a!=="del"&&armed){armed=null}
-  if(a==="sel"){UI.sel=t.dataset.k;keepUI();render();return}
+  if(a==="sel"){go(t.dataset.k);return}
   if(a==="go"){go(t.dataset.k);return}
   if(a==="view"){UI.view=t.dataset.v;keepUI();render();window.scrollTo(0,0);return}
   if(a==="report"){var ri=document.getElementById("rym");if(ri&&ri.value)downloadReport(ri.value);return}
@@ -739,27 +785,34 @@ app.addEventListener("click",function(e){
 function selectNotice(){var p=document.getElementById("notice");if(!p)return;var r=document.createRange();r.selectNodeContents(p);var s=window.getSelection();s.removeAllRanges();s.addRange(r);var b=document.getElementById("copybtn");if(b)b.textContent="선택됨 · Ctrl+C"}
 app.addEventListener("change",function(e){
   var t=e.target,a=t.dataset&&t.dataset.act;if(!a)return;
+  if(t.tagName==="SELECT"||t.type==="checkbox")ptrDown=false;
   if(a==="rym"){UI.rym=t.value;keepUI();return}
-  if(a==="checked"){var dk=ensure(UI.sel);if(!dk.chk)dk.chk={};chkItems(UI.sel).forEach(function(c){dk.chk[c.id]=t.checked});syncChecked(UI.sel);touch();render();return}
-  if(a==="subchk"){var ds=ensure(UI.sel);if(!ds.chk)ds.chk={};ds.chk[t.dataset.c]=t.checked;syncChecked(UI.sel);touch();render();return}
-  if(a==="closed"){ensure(UI.sel).closed=t.checked;touch();render();return}
+  if(a==="checked"){var dk=ensure(UI.sel);if(!dk.chk)dk.chk={};chkItems(UI.sel).forEach(function(c){dk.chk[c.id]=t.checked});syncChecked(UI.sel);touch();soon();return}
+  if(a==="subchk"){var ds=ensure(UI.sel);if(!ds.chk)ds.chk={};ds.chk[t.dataset.c]=t.checked;syncChecked(UI.sel);touch();soon();return}
+  if(a==="closed"){ensure(UI.sel).closed=t.checked;touch();soon();return}
   if(a==="entered"){var v=findAny(t.dataset.k,t.dataset.id);if(v){v.entered=t.checked;touch();setTimeout(render,500)}return}
   var v2=findVol(t.dataset.id);
-  if(a==="ent"&&v2){v2.entered=t.checked;touch();render();return}
-  if(a==="rog"&&v2){v2.rog=t.checked;autoAssign(UI.sel);touch();render();return}
-  if(a==="place"&&v2){v2.place=t.value;v2.locked=true;autoAssign(UI.sel);touch();render();return}
-  if(a==="dayrog"){ensure(UI.sel).rog=t.checked;autoAssign(UI.sel);touch();render();return}
-  if(a==="limelist"){var seen={};ST.lime=t.value.split(/[\n,]+/).map(function(x){return x.trim()}).filter(function(x){if(!x||seen[x])return false;seen[x]=1;return true});touch();render();return}
-  if(a==="cap"){var cv=t.value.trim();ST.cap[t.dataset.p]=cv===""?null:Math.max(0,parseInt(cv,10)||0);reassignFrom(TODAY);touch();render();return}
-  if(a==="rogday"){var w=+t.dataset.w;ST.rogDays=ST.rogDays.filter(function(x){return x!==w});if(t.checked)ST.rogDays.push(w);reassignFrom(TODAY);touch();render();return}
-  if(a==="name"&&v2){var n=t.value.trim();if(n){v2.name=n;touch()}render();return}
-  if(a==="memo"&&v2){v2.memo=t.value.trim();touch();render();return}
+  if(a==="ent"&&v2){v2.entered=t.checked;touch();soon();return}
+  if(a==="rog"&&v2){v2.rog=t.checked;autoAssign(UI.sel);touch();soon();return}
+  if(a==="place"&&v2){v2.place=t.value;v2.locked=true;autoAssign(UI.sel);touch();soon();return}
+  if(a==="dayrog"){ensure(UI.sel).rog=t.checked;autoAssign(UI.sel);touch();soon();return}
+  if(a==="limelist"){var seen={};ST.lime=t.value.split(/[\n,]+/).map(function(x){return x.trim()}).filter(function(x){if(!x||seen[x])return false;seen[x]=1;return true});touch();soon();return}
+  if(a==="cap"){var cv=t.value.trim();ST.cap[t.dataset.p]=cv===""?null:Math.max(0,parseInt(cv,10)||0);reassignFrom(TODAY);touch();soon();return}
+  if(a==="rogday"){var w=+t.dataset.w;ST.rogDays=ST.rogDays.filter(function(x){return x!==w});if(t.checked)ST.rogDays.push(w);reassignFrom(TODAY);touch();soon();return}
+  if(a==="name"&&v2){var n=t.value.trim();if(n){v2.name=n;touch()}soon();return}
+  if(a==="memo"&&v2){v2.memo=t.value.trim();touch();soon();return}
 });
-function doApply(){var r=applyBoxes(UI.sel);lastApply={k:UI.sel,added:r.added,removed:r.removed};touch();render()}
+function doApply(){var r=applyBoxes(UI.sel);delete QD[UI.sel];lastApply={k:UI.sel,added:r.added,removed:r.removed};touch();render()}
 app.addEventListener("keydown",function(e){if(e.target.dataset&&e.target.dataset.qe&&(e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();doApply()}});
 app.addEventListener("input",function(e){
   var t=e.target;
-  if(t.dataset&&t.dataset.qe){var c=document.getElementById(t.id+"-n");if(c)c.textContent=parseNames(t.value).length+"명";return}if(t.id!=="note")return;
+  if(t.dataset&&t.dataset.qe){
+    var c=document.getElementById(t.id+"-n");if(c)c.textContent=parseNames(t.value).length+"명";
+    var b0=boxes(UI.sel).filter(function(b){return b.id===t.id})[0],q=QD[UI.sel]=QD[UI.sel]||{};
+    if(b0&&t.value===boxVols(UI.sel,b0).map(function(v){return v.name}).join("\n"))delete q[t.id];else q[t.id]=t.value;
+    if(!Object.keys(q).length)delete QD[UI.sel];
+    var mg=document.getElementById("qe-msg");if(mg){mg.textContent=qeMsg(UI.sel);mg.className="muted"+(qeDirty(UI.sel)?" dirty":"")}
+    return}if(t.id!=="note")return;
   ensure(UI.sel).note=t.value;var p=document.getElementById("notice");if(p)p.textContent=notice(UI.sel);touch();
 });
 app.addEventListener("submit",function(e){
