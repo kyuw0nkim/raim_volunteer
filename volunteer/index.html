@@ -562,10 +562,23 @@ function patchOf(){
 }
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function saveHTML(){
-  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",merging:"다른 기기 변경과 합치는 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"합치지 못했어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
+  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",merging:"다른 기기 변경과 합치는 중…",error:"저장 실패 · "+failWhy+" · 자동으로 다시 시도해요",retrying:"저장 다시 시도 중… ("+failWhy+")",conflict:"합치지 못했어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
   var btn=saveState==="conflict"?' <button type="button" data-act="savenow">지금 저장</button> · <button type="button" data-act="reload">최신 내용 불러오기</button>':(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':saveState==="newer"?' <button type="button" data-act="reload">최신 내용 불러오기</button>':saveState==="offline"?' <button type="button" data-act="reload">다시 시도</button>':"";
-  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",merging:"saving",newer:"pending"}[saveState]||saveState;
+  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",merging:"saving",newer:"pending",retrying:"pending"}[saveState]||saveState;
   return '<span class="save" id="save" data-s="'+s+'" role="status"><i></i>'+t+btn+'</span>';
+}
+/* a save that fails for a passing reason (slow web app, network, another save holding the sheet) is retried by
+   itself with growing gaps; '저장 실패' shows only after several tries in a row, and it keeps retrying */
+var failN=0,failWhy="",retryT=null;
+function why(res,err){
+  if(err)return err.message==="timeout"?"웹앱 응답이 늦어요":"연결이 끊겼어요";
+  if(res&&res.code==="busy")return "다른 저장을 기다리는 중";
+  return "웹앱 오류"+(res&&res.message?": "+String(res.message).slice(0,80):"");
+}
+function failed(res,err){
+  inflight=false;again=false;failN++;failWhy=why(res,err);
+  setSave(failN>=4?"error":"retrying");
+  clearTimeout(retryT);retryT=setTimeout(function(){retryT=null;save()},Math.min(30000,1500*Math.pow(2,failN-1))+Math.random()*1000);
 }
 function touch(){if(saveState==="conflict")retries=0;DIRTY=true;cacheSoon();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
 function save(){
@@ -575,25 +588,26 @@ function save(){
   inflight=true;setSave("saving");
   var sent=JSON.stringify(S);
   var data=PATCH&&BASE?'"patch":'+JSON.stringify(patchOf()):'"state":'+sent;
-  RAIM.fetchJSON(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:'{"token":'+JSON.stringify(API.token)+',"action":"save","baseVersion":'+VERSION+','+data+'}'},30000)
+  RAIM.fetchJSON(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:'{"token":'+JSON.stringify(API.token)+',"action":"save","baseVersion":'+VERSION+','+data+'}'},60000)
   .then(function(res){
-    if(res&&res.ok){inflight=false;retries=0;VERSION=res.version;BASE=JSON.parse(sent);if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
-    if(res&&res.code==="conflict"&&retries<4){
+    if(res&&res.ok){inflight=false;retries=0;failN=0;VERSION=res.version;BASE=JSON.parse(sent);if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
+    if(res&&res.code==="conflict"&&retries<8){
       // someone else saved first: take their version, put our changes on top, try again
+      // (a short random wait so several phones saving at once don't keep colliding)
       retries++;setSave("merging");
-      return RAIM.fetchJSON(loadURL(false)).then(function(r2){
+      return new Promise(function(ok){setTimeout(ok,retries>1?300+Math.random()*1200*retries:0)}).then(function(){return RAIM.fetchJSON(loadURL(false),{},40000)}).then(function(r2){
+        if(!r2||!r2.ok||!r2.state){failed(r2);return}
         inflight=false;again=false;
-        if(!r2||!r2.ok||!r2.state){setSave("error");return}
         PATCH=r2.patch===1;
         rebase(r2);save();
-      });
+      },function(err){failed(null,err)});
     }
     inflight=false;again=false;
     if(res&&res.code==="conflict"){setSave("conflict");return}
     if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
-    setSave("error");
-  }).catch(function(){inflight=false;setSave("error")});
+    failed(res);
+  },function(err){failed(null,err)});
 }
 function typing(){var a=document.activeElement;return !!(a&&a.closest&&a.closest("#app")&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
 function applyServer(res){initState(res.state);BASE=clone(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=false;writeCache()}
@@ -898,7 +912,7 @@ app.addEventListener("click",function(e){
   if(a==="view"){UI.view=t.dataset.v;keepUI();render();window.scrollTo(0,0);return}
   if(a==="report"){var ri=document.getElementById("rym");if(ri&&ri.value)downloadReport(ri.value);return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
-  if(a==="savenow"){retries=0;if(saveState==="conflict")saveState="pending";save();return}
+  if(a==="savenow"){retries=0;failN=0;clearTimeout(retryT);retryT=null;if(saveState==="conflict")saveState="pending";save();return}
   if(a==="reload"){if(saveState==="offline"&&DIRTY){saveState="pending";save();return}saveState="idle";load(false);return}
   if(a==="setup"){if(saveTimer)save();showSetup();return}
   if(a==="qeapply"){doApply();return}

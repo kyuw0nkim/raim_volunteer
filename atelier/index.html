@@ -424,8 +424,8 @@ function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,
 var PATCH=false,BASEJ=null;
 function snap(){var o={seeded:!!S.seeded};LISTS.forEach(function(k){o[k]=JSON.stringify(S[k])});return o}
 function saveHTML(){
-  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",checking:"최신 내용 확인 중…"}[saveState]||"";
-  return '<span class="save" id="save" data-s="'+(saveState==="checking"?"saving":saveState)+'" role="status"><i></i>'+t+(saveState==="error"?' <button type="button" data-act="savenow">다시 저장</button>':'')+'</span>';
+  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · "+failWhy+" · 자동으로 다시 시도해요",retrying:"저장 다시 시도 중… ("+failWhy+")",checking:"최신 내용 확인 중…"}[saveState]||"";
+  return '<span class="save" id="save" data-s="'+(saveState==="checking"?"saving":saveState==="retrying"?"pending":saveState)+'" role="status"><i></i>'+t+(saveState==="error"?' <button type="button" data-act="savenow">다시 저장</button>':'')+'</span>';
 }
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function dispatch(op){apply(op);pending.push(op);writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,800);soon()}
@@ -433,9 +433,23 @@ function post(){
   var now=snap(),head='{"token":'+JSON.stringify(API.token)+',"board":"atelier","action":"save","baseVersion":'+VERSION+',',body;
   if(PATCH&&BASEJ)body=head+'"patch":{"seeded":'+now.seeded+',"lists":{'+LISTS.filter(function(k){return now[k]!==BASEJ[k]}).map(function(k){return '"'+k+'":'+now[k]}).join(",")+'}}}';
   else body=head+'"state":'+JSON.stringify(S)+'}';
-  return RAIM.fetchJSON(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:body},30000).then(function(res){if(res&&res.ok)BASEJ=now;return res});
+  return RAIM.fetchJSON(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:body},60000).then(function(res){if(res&&res.ok)BASEJ=now;return res});
 }
-function fetchState(bg){return RAIM.fetchJSON(RAIM.url(API,"action=load&board=atelier"+(bg?"&v="+VERSION+"&cv="+CLOSEDV:"")))}
+function fetchState(bg){return RAIM.fetchJSON(RAIM.url(API,"action=load&board=atelier"+(bg?"&v="+VERSION+"&cv="+CLOSEDV:"")),{},40000)}
+/* passing failures (slow web app, network, another save holding the sheet) retry by themselves with growing gaps;
+   '저장 실패' shows only after several tries in a row, and retrying goes on */
+var failN=0,failWhy="",retryT=null;
+function why(res,err){
+  if(err)return err.message==="timeout"?"웹앱 응답이 늦어요":"연결이 끊겼어요";
+  if(res&&res.code==="busy")return "다른 저장을 기다리는 중";
+  if(res&&res.code==="conflict")return "다른 기기와 동시에 저장 중";
+  return "웹앱 오류"+(res&&res.message?": "+String(res.message).slice(0,80):"");
+}
+function failed(res,err){
+  inflight=false;failN++;failWhy=why(res,err);
+  setSave(failN>=4?"error":"retrying");
+  clearTimeout(retryT);retryT=setTimeout(function(){retryT=null;retries=0;save()},Math.min(30000,1500*Math.pow(2,failN-1))+Math.random()*1000);
+}
 function save(){
   clearTimeout(saveTimer);saveTimer=null;
   if(!API||!loaded||!pending.length)return;
@@ -443,22 +457,22 @@ function save(){
   inflight=true;setSave("saving");
   var sent=pending.length;
   post().then(function(res){
-    if(res&&res.ok){inflight=false;VERSION=res.version;pending.splice(0,sent);retries=0;writeCache();if(pending.length)save();else setSave("idle");return}
-    if(res&&res.code==="conflict"&&retries<4){
+    if(res&&res.ok){inflight=false;VERSION=res.version;pending.splice(0,sent);retries=0;failN=0;writeCache();if(pending.length)save();else setSave("idle");return}
+    if(res&&res.code==="conflict"&&retries<8){
       // someone else saved first: take their version, replay our changes on top, try again
+      // (a short random wait so several phones ticking the checklist at once don't keep colliding)
       retries++;
-      return fetchState().then(function(r2){
+      return new Promise(function(ok){setTimeout(ok,retries>1?300+Math.random()*1200*retries:0)}).then(fetchState).then(function(r2){
+        if(!r2||!r2.ok||r2.board!=="atelier"){failed(r2);return}
         inflight=false;
-        if(!r2||!r2.ok||r2.board!=="atelier"){setSave("error");return}
         norm(r2.state);CLOSED=r2.closed||{};VERSION=r2.version||0;CLOSEDV=r2.closedVersion||0;BASEJ=snap();PATCH=r2.patch===1;
         pending.forEach(apply);render();save();
-      });
+      },function(err){failed(null,err)});
     }
-    inflight=false;
-    if(res&&res.code==="forbidden"){noAccess();return}
-    if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
-    setSave("error");
-  }).catch(function(){inflight=false;setSave("error")});
+    if(res&&res.code==="forbidden"){inflight=false;noAccess();return}
+    if(res&&res.code==="auth"){inflight=false;showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
+    failed(res);
+  },function(err){failed(null,err)});
 }
 function load(silent){
   if(!API){showSetup();return}
@@ -762,7 +776,7 @@ app.addEventListener("click",function(e){
   if(a==="tab"){if(t.dataset.v==="settings"&&UI.tab!=="settings")UI.back=UI.tab;UI.tab=t.dataset.v;keepUI();armed=null;render();window.scrollTo(0,0);try{history.replaceState(null,"","#"+UI.tab)}catch(x){}return}
   if(a==="me"){me(true).then(render);return}
   if(a==="setup"){if(pending.length)save();showSetup();return}
-  if(a==="savenow"){retries=0;save();return}
+  if(a==="savenow"){retries=0;failN=0;clearTimeout(retryT);retryT=null;save();return}
   if(a==="sel"){var sk=t.dataset.k;UI.sel=sk;UI.vy=+sk.slice(0,4);UI.vm=+sk.slice(4,6)-1;keepUI();render();
     var dy=document.querySelector(".card.day");if(dy&&window.innerWidth<901&&dy.getBoundingClientRect().top>window.innerHeight*.5)dy.scrollIntoView({block:"start",behavior:"smooth"});return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
