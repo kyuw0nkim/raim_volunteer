@@ -448,42 +448,107 @@ var restoreY=null;try{restoreY=+sessionStorage.getItem("raim-scroll");sessionSto
 
 /* ---------- sync with the Google Sheet (Apps Script web app) ---------- */
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false;
+var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false,retries=0;
+/* BASE = what the sheet had when we last loaded or saved. If someone else saves first, the sheet rejects
+   our save; we then fetch their version and merge: whatever we changed since BASE wins, everything else
+   is taken from theirs (per day field, per 1365 check, per volunteer field). */
+var BASE=null;
+function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
+function same(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function pick(b,m,t){return same(m,b)?t:m}
+function keysOf(){var o={};for(var i=0;i<arguments.length;i++)Object.keys(arguments[i]||{}).forEach(function(k){o[k]=1});return Object.keys(o)}
+function mergeState(B,M,T){
+  B=B||{};M=M||{};T=T||{};
+  var bs=B.settings||{},ms=M.settings||{},ts=T.settings||{},out={days:{},settings:{}},both=[];
+  keysOf(bs,ms,ts).forEach(function(k){
+    if(k==="cap"){var c={},bc=bs.cap||{},mc=ms.cap||{},tc=ts.cap||{};keysOf(bc,mc,tc).forEach(function(p){var v=pick(bc[p],mc[p],tc[p]);if(v!==undefined)c[p]=v});out.settings.cap=c;return}
+    var v=pick(bs[k],ms[k],ts[k]);if(v!==undefined)out.settings[k]=clone(v);
+  });
+  var bd=B.days||{},md=M.days||{},td=T.days||{};
+  keysOf(bd,md,td).forEach(function(k){
+    var b=bd[k],m=md[k],t=td[k];
+    if(same(m,b)){if(t)out.days[k]=clone(t)}
+    else if(same(t,b)){if(m)out.days[k]=clone(m)}
+    else{out.days[k]=mergeDay(b,m,t);both.push(k)}
+  });
+  return {state:out,both:both};
+}
+function mergeDay(b,m,t){
+  b=b||{};m=m||{};t=t||{};
+  var d={};
+  ["checked","closed","rog","note"].forEach(function(f){var v=pick(b[f],m[f],t[f]);if(v!==undefined)d[f]=v});
+  var bc=b.chk||{},mc=m.chk||{},tc=t.chk||{};d.chk={};
+  keysOf(bc,mc,tc).forEach(function(c){if(pick(bc[c],mc[c],tc[c]))d.chk[c]=true});
+  function idx(L){var o={};(L||[]).forEach(function(v){o[v.id]=v});return o}
+  var bv=idx(b.vols),mv=idx(m.vols),tv=idx(t.vols),vols=[];
+  (t.vols||[]).forEach(function(x){
+    var bx=bv[x.id],mx=mv[x.id];
+    if(bx&&!mx)return;                         // we deleted it
+    if(!bx||!mx){vols.push(clone(x));return}   // they added it
+    var o={};keysOf(bx,mx,x).forEach(function(f){var v=pick(bx[f],mx[f],x[f]);if(v!==undefined)o[f]=clone(v)});vols.push(o);
+  });
+  (m.vols||[]).forEach(function(x){
+    if(tv[x.id]||bv[x.id])return;              // already merged, or they deleted it
+    // both pasted the same 1365 list: keep one
+    if(vols.some(function(y){return !bv[y.id]&&y.name===x.name&&y.slot===x.slot}))return;
+    vols.push(clone(x));
+  });
+  d.vols=vols;
+  return d;
+}
+/* take their newer copy and put our unsaved changes on top of it */
+function rebase(res){
+  var r=mergeState(BASE,S,res.state);
+  initState(r.state);BASE=clone(res.state);VERSION=res.version||0;
+  if(res.lime){LIME=res.lime;LIMESRC=LIME.length?"sheet":"board"}
+  r.both.forEach(function(k){var d=S.days[k];if(!d)return;if(d.chk&&Object.keys(d.chk).length)syncChecked(k);if(k>=TODAY)autoAssign(k)});
+  writeCache();
+  if(!typing())render();
+}
+function loadURL(withV){return API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(withV?"&v="+VERSION:"")}
 /* the last copy is kept in this browser so the board opens instantly; the sheet is checked right after */
 var CACHEKEY="raim-cache";
 function readCache(){try{var c=JSON.parse(localStorage.getItem(CACHEKEY)||"null");if(c&&API&&c.url===API.url&&c.state)return c}catch(e){}return null}
-function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,lime:LIME,dirty:DIRTY}))}catch(e){}}
+function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,base:BASE,lime:LIME,dirty:DIRTY}))}catch(e){}}
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function saveHTML(){
-  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"다른 기기에서 먼저 저장됐어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
-  var btn=(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':(saveState==="conflict"||saveState==="newer")?' <button type="button" data-act="reload">최신 내용 불러오기</button>':saveState==="offline"?' <button type="button" data-act="reload">다시 시도</button>':"";
-  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",newer:"pending"}[saveState]||saveState;
+  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",merging:"다른 기기 변경과 합치는 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"합치지 못했어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
+  var btn=saveState==="conflict"?' <button type="button" data-act="savenow">지금 저장</button> · <button type="button" data-act="reload">최신 내용 불러오기</button>':(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':saveState==="newer"?' <button type="button" data-act="reload">최신 내용 불러오기</button>':saveState==="offline"?' <button type="button" data-act="reload">다시 시도</button>':"";
+  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",merging:"saving",newer:"pending"}[saveState]||saveState;
   return '<span class="save" id="save" data-s="'+s+'" role="status"><i></i>'+t+btn+'</span>';
 }
-function touch(){if(saveState==="conflict")return;DIRTY=true;writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
+function touch(){if(saveState==="conflict")retries=0;DIRTY=true;writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
 function save(){
   clearTimeout(saveTimer);saveTimer=null;
   if(!API||!loaded||saveState==="conflict")return;
   if(inflight){again=true;return}
   inflight=true;setSave("saving");
-  fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API.token,action:"save",baseVersion:VERSION,state:S})})
+  var sent=JSON.stringify(S);
+  fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:'{"token":'+JSON.stringify(API.token)+',"action":"save","baseVersion":'+VERSION+',"state":'+sent+'}'})
   .then(function(r){return r.json()}).then(function(res){
-    inflight=false;
-    if(res&&res.ok){VERSION=res.version;if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
-    again=false;
+    if(res&&res.ok){inflight=false;retries=0;VERSION=res.version;BASE=JSON.parse(sent);if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
+    if(res&&res.code==="conflict"&&retries<4){
+      // someone else saved first: take their version, put our changes on top, try again
+      retries++;setSave("merging");
+      return fetch(loadURL(false)).then(function(r){return r.json()}).then(function(r2){
+        inflight=false;again=false;
+        if(!r2||!r2.ok||!r2.state){setSave("error");return}
+        rebase(r2);save();
+      });
+    }
+    inflight=false;again=false;
     if(res&&res.code==="conflict"){setSave("conflict");return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
     setSave("error");
-  },function(){inflight=false;setSave("error")});
+  }).catch(function(){inflight=false;setSave("error")});
 }
 function typing(){var a=document.activeElement;return !!(a&&a.closest&&a.closest("#app")&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
-function applyServer(res){initState(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=false;writeCache()}
+function applyServer(res){initState(res.state);BASE=clone(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=false;writeCache()}
 /* bg=true: quiet check in the background (the page is already showing the saved copy) */
 function load(bg){
   if(!API){showSetup();return}
   if(!bg&&loaded)setSave("loading");
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(bg&&loaded?"&v="+VERSION:"");
-  fetch(u).then(function(r){return r.json()}).then(function(res){
+  fetch(loadURL(bg&&loaded)).then(function(r){return r.json()}).then(function(res){
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(!res||!res.ok){
       if(loaded){setSave(bg?(saveState==="checking"?"offline":saveState):"error");return}
@@ -492,7 +557,8 @@ function load(bg){
     if(bg&&loaded){
       var sameVer=res.same||res.version===VERSION;
       var limeChanged=JSON.stringify(res.lime||[])!==JSON.stringify(LIME);
-      if(DIRTY||saveTimer||inflight){if(!sameVer)setSave("conflict");else if(saveState==="checking")setSave("idle");return}
+      // unsaved changes here: the next save merges with the newer sheet by itself
+      if(DIRTY||saveTimer||inflight){if(!saveTimer&&!inflight){retries=0;if(saveState==="conflict")saveState="pending";save()}else if(saveState==="checking")setSave("pending");return}
       if(sameVer&&!limeChanged){if(saveState==="checking")setSave("idle");return}
       if(typing()){setSave("newer");return}
       if(sameVer){LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";writeCache();saveState="idle";render();return}
@@ -559,6 +625,7 @@ function todo(){
 
 /* ---------- render ---------- */
 var armed=null;
+var CONFLICTMSG='<div class="banner">다른 기기에서 계속 동시에 저장하고 있어서 합치지 못했어요. ‘지금 저장’으로 다시 시도하거나, ‘최신 내용 불러오기’로 시트 내용을 다시 열 수 있어요 (그러면 이 기기에서 방금 바꾼 내용은 빠져요).</div>';
 /* re-rendering while a mouse/finger is down swallows the click (the element under it is replaced),
    e.g. typing a memo and then pressing 출석. So wait until the click has gone through. */
 var ptrDown=false,deferred=false,kbd=false,ptrSeq=0,soonT=null;
@@ -593,7 +660,7 @@ function paint(){
   if(UI.view==="settings"){
     h+='<a class="crumb" href="../">← RAIM 업무 대시보드</a>';
     h+='<header class="top"><h1>설정<small>배치 규칙 · 라메 명단 · 활동기록부</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="board">← 보드로</button></div></header>';
-    if(saveState==="conflict")h+='<div class="banner">다른 기기나 창에서 먼저 저장했어요. ‘최신 내용 불러오기’를 누른 뒤 다시 입력해 주세요. 방금 바꾼 내용은 저장되지 않았어요.</div>';
+    if(saveState==="conflict")h+=CONFLICTMSG;
     h+=rulesHTML();
     h+=reportHTML();
     h+='<div class="setfoot"><span>웹앱 주소·접속 코드를 바꾸려면</span><button type="button" class="btn" data-act="setup">연결 설정</button></div>';
@@ -601,7 +668,7 @@ function paint(){
   }
   h+='<a class="crumb" href="../">← RAIM 업무 대시보드</a>';
   h+='<header class="top"><h1>RAIM 자원봉사 보드<small>1365 명단 확인 · 출석 · 실적 입력을 한곳에서</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="settings" title="배치 규칙 · 라메 명단">설정</button></div></header>';
-  if(saveState==="conflict")h+='<div class="banner">다른 기기나 창에서 먼저 저장했어요. ‘최신 내용 불러오기’를 누른 뒤 다시 입력해 주세요. 방금 바꾼 내용은 저장되지 않았어요.</div>';
+  if(saveState==="conflict")h+=CONFLICTMSG;
 
   // lanes
   h+='<section class="todo" aria-label="할 일">';
@@ -767,7 +834,7 @@ app.addEventListener("click",function(e){
   if(a==="view"){UI.view=t.dataset.v;keepUI();render();window.scrollTo(0,0);return}
   if(a==="report"){var ri=document.getElementById("rym");if(ri&&ri.value)downloadReport(ri.value);return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
-  if(a==="savenow"){save();return}
+  if(a==="savenow"){retries=0;if(saveState==="conflict")saveState="pending";save();return}
   if(a==="reload"){if(saveState==="offline"&&DIRTY){saveState="pending";save();return}saveState="idle";load(false);return}
   if(a==="setup"){if(saveTimer)save();showSetup();return}
   if(a==="qeapply"){doApply();return}
@@ -838,6 +905,8 @@ app.addEventListener("submit",function(e){
   var c=API&&readCache();
   if(!c){load(false);return}
   initState(c.state);VERSION=c.version||0;LIME=c.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=!!c.dirty;
+  // older caches have no base: then unsaved changes here win everywhere when merging
+  BASE=c.base||(DIRTY?{days:{},settings:{}}:clone(c.state));
   saveState=DIRTY?"pending":"checking";render();
   if(DIRTY)save();else load(true);
 })();
