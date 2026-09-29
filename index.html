@@ -164,7 +164,7 @@ function atSummary(res){
       else if(dd===0)todo.push({name:t.name,txt:"오늘",hot:true});
       else if(dd<=2)todo.push({name:t.name,txt:"D-"+dd});
     }else{
-      var w=num(t.warn);if(w!=null&&(!last||diff(last,TODAY)>=w))todo.push({name:t.name,txt:"점검 권장"});
+      var w=num(t.warn);if(w!=null&&(!last||diff(last,TODAY)>=w)&&!(t.snooze&&t.snooze>TODAY))todo.push({name:t.name,txt:"제안"});
     }
   });
   var low=(s.items||[]).filter(function(i){var q=num(i.qty),m=num(i.min);return m!=null&&q!=null&&q<=m});
