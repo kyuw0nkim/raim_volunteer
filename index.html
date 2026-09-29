@@ -16,7 +16,7 @@
   --canvas:#FFFFFF;--canvas-soft:#F4F8FB;--canvas-cream:#F6EFE5;
   --primary:#4AADFD;--primary-deep:#1479CC;--primary-press:#185691;--primary-soft:#81C5FE;--primary-subdued:#C3E4FD;
   --brand-dark:#152A42;--aqua:#33D1E6;--periwinkle:#9885F4;--sand:#EBAD5C;
-  --ink:#0C243B;--ink-2:#2E4256;--muted:#65778B;--line:#E3E8EE;--line-input:#ADC4D7;
+  --ink:#0C243B;--ink-2:#2E4256;--muted:#536476;--line:#E3E8EE;--line-input:#ADC4D7;
   --on-dark:#FFFFFF;--on-primary:#0C243B;
   --shadow-1:0 1px 3px rgba(6,58,107,.08);
   --shadow-2:0 8px 24px rgba(6,58,107,.08),0 2px 6px rgba(6,58,107,.04);
@@ -103,10 +103,20 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .todo li a{display:flex;justify-content:space-between;gap:8px;width:100%;padding:6px 10px;color:inherit;text-decoration:none;border-radius:8px}
 .todo li a:hover,.stat:hover{box-shadow:inset 0 0 0 1px var(--line-input)}
 @media (max-width:640px){.setup-f input{font-size:16px}}
+/* ux pass: red = do today, orange = piling up */
+.stat.warn{background:var(--warn-soft)}.stat.warn b{color:var(--warn)}
+.todo li.soon span:last-child,.todo li.pile span:last-child{color:var(--warn);font-weight:450}
+.todo li.dim span{color:var(--muted)}
+.grp{display:grid;gap:6px}
+.grp h3{margin:0;font-size:13px;font-weight:600;color:var(--ink-2)}
+.desc,.stat span,.todo li span:last-child{font-size:13px}
+.linkbtn{font-size:13px;padding:8px 0;color:var(--ink-2)}
+.todo li a{min-height:40px;align-items:center}
 </style>
 </head>
 <body>
 <div id="app"><p class="boot">불러오는 중…</p></div>
+<script src="common.js?v=2"></script>
 <script>
 (function(){
 "use strict";
@@ -114,130 +124,85 @@ var WD=["일","월","화","수","목","금","토"];
 function pad(n){return (n<10?"0":"")+n}
 function keyOf(d){return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())}
 function dateOf(k){return new Date(+k.slice(0,4),+k.slice(4,6)-1,+k.slice(6,8))}
-function addDays(k,n){var d=dateOf(k);d.setDate(d.getDate()+n);return keyOf(d)}
 function diff(a,b){return Math.round((dateOf(b)-dateOf(a))/86400000)}
 function md(k){var d=dateOf(k);return (d.getMonth()+1)+"/"+d.getDate()+" ("+WD[d.getDay()]+")"}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function num(v){return v===""||v==null||isNaN(+v)?null:+v}
 var TODAY=keyOf(new Date());
 
-var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-/* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
-(function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
-document.addEventListener("click",function(e){
-  var b=e.target.closest("[data-act=copylink]");if(!b||!API)return;
-  var s=location.origin+location.pathname+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(API.token);
-  var manual=function(){window.prompt("이 링크를 복사해서 공유하세요. 열면 웹앱 주소·접속 코드가 자동으로 들어가요.",s)};
-  try{navigator.clipboard.writeText(s).then(function(){b.textContent="링크 복사됨 · 단톡방에 붙여넣기"},manual)}catch(x){manual()}
-});
-function get(board,extra){
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(board?"&board="+board:"")+(extra||"");
-  return fetch(u).then(function(r){return r.json()}).catch(function(){return {ok:false,code:"net"}});
-}
+var API=RAIM.api;   // 연결 정보·연결 링크·링크 복사는 common.js
+/* 대시보드는 웹앱의 요약(action=summary)만 받아요. 숫자와 할 일 목록뿐이라 빠르고,
+   봉사자 이름·연락처 같은 보드 전체 내용이 이 기기에 남지 않아요. 마지막 요약은 저장해 두었다가 바로 보여 줘요 */
+var CK="raim-cache-summary",DATA=null,ERR="";
+function readC(){try{var c=JSON.parse(localStorage.getItem(CK)||"null");if(c&&c.url===API.url&&c.tok===API.token&&c.data)return c}catch(e){}return null}
 
-/* ---------- 자원봉사 ---------- */
-function volSummary(res){
-  var days=(res.state&&res.state.days)||{};
-  function closed(k){var d=days[k];if(d&&typeof d.closed==="boolean")return d.closed;return dateOf(k).getDay()===1}
-  var t=days[TODAY],todayN=(t&&!closed(TODAY))?t.vols.length:0,noAtt=0,entry=0;
-  Object.keys(days).forEach(function(k){
-    if(closed(k))return;var d=days[k];
-    (d.vols||[]).forEach(function(v){if(k<=TODAY&&v.attend==null)noAtt++;if(v.attend==="o"&&!v.entered)entry++});
-  });
-  return {todayN:todayN,closedToday:closed(TODAY),noAtt:noAtt,entry:entry};
-}
-function volHTML(res){
+function volHTML(s){
   var h='<section class="board"><div class="bh"><h2>자원봉사 보드</h2><a class="open" href="volunteer/">열기 →</a></div><p class="desc">1365 명단 확인 · 배치 · 출석 · 실적 입력</p>';
-  if(!res.ok)return h+'<p class="note">불러오지 못했어요.</p></section>';
-  var s=volSummary(res);
   h+='<div class="stats"><a class="stat" href="volunteer/"><b>'+(s.closedToday?"휴관":s.todayN)+'</b><span>오늘 봉사자</span></a>';
   h+='<a class="stat'+(s.noAtt?" hot":" good")+'" href="volunteer/"><b>'+s.noAtt+'</b><span>출석 표시 필요</span></a>';
-  h+='<a class="stat'+(s.entry?" hot":" good")+'" href="volunteer/"><b>'+s.entry+'</b><span>1365 입력 대기</span></a></div>';
-  return h+'</section>';
+  h+='<a class="stat'+(s.entry?" warn":" good")+'" href="volunteer/"><b>'+s.entry+'</b><span>1365 입력 대기</span></a></div>';
+  var g=[];
+  if(!s.closedToday&&s.am!=null)g.push(group("오늘",['<li><a href="volunteer/"><span>오전 '+s.am+'명 · 오후 '+s.pm+'명</span><span>명단 보기</span></a></li>']));
+  if(s.unchecked&&s.unchecked.length)g.push(group("1365 명단 미확인",s.unchecked.slice(0,4).map(function(k){return '<li class="'+(diff(TODAY,k)<=2?"hot":"")+'"><a href="volunteer/"><span>'+md(k)+'</span><span>'+(k===TODAY?"오늘":diff(TODAY,k)+"일 뒤")+'</span></a></li>'})));
+  return h+g.join("")+'</section>';
 }
-
-/* ---------- 아뜰리에 ---------- */
-function atSummary(res){
-  var s=res.state||{},C=res.closed||{};
-  function closed(k){if(typeof C[k]==="boolean")return C[k];return dateOf(k).getDay()===1}
-  function nextOpen(k){for(var i=0;i<14&&closed(k);i++)k=addDays(k,1);return k}
-  var logs=s.logs||[],todo=[];
-  (s.tasks||[]).forEach(function(t){
-    var L=logs.filter(function(l){return l.task===t.id}).map(function(l){return l.date}).sort(),last=L[L.length-1];
-    if(L.indexOf(TODAY)>=0)return;
-    if(t.flagDate){todo.push({name:t.name,txt:"필요해요",hot:true});return}
-    if(t.type==="주기"){
-      var due=nextOpen(last?addDays(last,num(t.every)||7):TODAY),dd=diff(TODAY,due);
-      if(dd<0)todo.push({name:t.name,txt:(-dd)+"일 지남",hot:true});
-      else if(dd===0)todo.push({name:t.name,txt:"오늘",hot:true});
-      else if(dd<=2)todo.push({name:t.name,txt:"D-"+dd});
-    }else{
-      var w=num(t.warn);if(w!=null&&(!last||diff(last,TODAY)>=w)&&!(t.snooze&&t.snooze>TODAY))todo.push({name:t.name,txt:"제안"});
-    }
-  });
-  var low=(s.items||[]).filter(function(i){var q=num(i.qty),m=num(i.min);return m!=null&&q!=null&&q<=m});
-  var issues=(s.issues||[]).filter(function(i){return i.status!=="해결"});
-  var items=s.checkItems||[],checks=(s.checks||[]).filter(function(c){return c.date===TODAY});
-  var ck=items.filter(function(it){return checks.some(function(c){return c.kind===it.kind&&c.label===it.label})}).length;
-  return {todo:todo,low:low,issues:issues,ck:ck,ckOf:items.length,closedToday:closed(TODAY)};
-}
-function atHTML(res){
-  var h='<section class="board"><div class="bh"><h2>아뜰리에 관리 보드</h2><a class="open" href="atelier/">열기 →</a></div><p class="desc">루틴 업무 · 개관/마감 점검 · 재고 · 장비 이슈</p>';
-  if(res.ok&&res.board!=="atelier")return h+'<div class="banner">Apps Script를 새 버전으로 바꿔야 아뜰리에 보드를 쓸 수 있어요. 저장소의 <b>apps-script</b> 폴더를 참고하세요.</div></section>';
-  if(!res.ok)return h+'<p class="note">불러오지 못했어요.</p></section>';
-  var s=atSummary(res),hot=s.todo.filter(function(t){return t.hot}).length;
-  h+='<div class="stats"><a class="stat'+(hot?" hot":" good")+'" href="atelier/#today"><b>'+hot+'</b><span>오늘 할 루틴</span></a>';
+function atHTML(s){
+  var h='<section class="board"><div class="bh"><h2>아뜰리에 관리 보드</h2><a class="open" href="atelier/">열기 →</a></div><p class="desc">할 일 · 제안 업무 · 개관/마감 점검 · 재고 · 장비 이슈</p>';
+  var hot=s.todo.filter(function(t){return t.hot}).length;
+  h+='<div class="stats"><a class="stat'+(hot?" hot":" good")+'" href="atelier/#today"><b>'+hot+'</b><span>오늘 할 일</span></a>';
   h+='<a class="stat'+(s.closedToday?"":s.ck<s.ckOf?"":" good")+'" href="atelier/#today"><b>'+(s.closedToday?"휴관":s.ck+"/"+s.ckOf)+'</b><span>오늘 점검</span></a>';
-  h+='<a class="stat'+(s.low.length?" hot":" good")+'" href="atelier/#stock"><b>'+s.low.length+'</b><span>재고 부족</span></a>';
-  h+='<a class="stat'+(s.issues.length?" hot":" good")+'" href="atelier/#issues"><b>'+s.issues.length+'</b><span>장비 이슈</span></a></div>';
-  var rows=s.todo.map(function(t){return '<li class="'+(t.hot?"hot":"")+'"><a href="atelier/#today"><span>'+esc(t.name)+'</span><span>'+esc(t.txt)+'</span></a></li>'})
-    .concat(s.low.map(function(i){return '<li class="hot"><a href="atelier/#stock"><span>재고: '+esc(i.name)+'</span><span>'+esc(i.qty)+esc(i.unit)+' 남음</span></a></li>'}))
-    .concat(s.issues.slice(0,3).map(function(i){return '<li><a href="atelier/#issues"><span>'+(i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text)+'</span><span>'+diff(i.date,TODAY)+'일째</span></a></li>'}));
-  if(s.issues.length>3)rows.push('<li><a href="atelier/#issues"><span>장비 이슈 '+(s.issues.length-3)+'건 더</span><span>전체 보기 →</span></a></li>');
-  if(rows.length)h+='<ul class="todo">'+rows.join("")+'</ul>';
-  return h+'</section>';
+  h+='<a class="stat'+(s.low.length?" warn":" good")+'" href="atelier/#stock"><b>'+s.low.length+'</b><span>재고 부족</span></a>';
+  h+='<a class="stat'+(s.issues.length?" warn":" good")+'" href="atelier/#issues"><b>'+s.issues.length+'</b><span>장비 이슈</span></a></div>';
+  /* grouped so 'must do today' isn't mixed with suggestions, stock and equipment */
+  var li=function(href,cls){return function(a,b){return '<li class="'+cls+'"><a href="'+href+'"><span>'+a+'</span><span>'+b+'</span></a></li>'}};
+  var todo=s.todo.filter(function(t){return t.txt!=="제안"}),sug=s.todo.filter(function(t){return t.txt==="제안"}),g=[];
+  if(todo.length)g.push(group("할 일",todo.map(function(t){return li("atelier/#today",t.hot?"hot":"soon")(esc(t.name),esc(t.txt))})));
+  if(sug.length)g.push(group("제안 업무",sug.map(function(t){return li("atelier/#today","dim")(esc(t.name),"제안")})));
+  if(s.low.length)g.push(group("재고 부족",s.low.map(function(i){return li("atelier/#stock","pile")(esc(i.name),esc(i.qty)+esc(i.unit)+" 남음")})));
+  if(s.issues.length)g.push(group("장비 이슈",s.issues.slice(0,3).map(function(i){return li("atelier/#issues","")((i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text),diff(i.date,TODAY)+"일째")}).concat(s.issues.length>3?[li("atelier/#issues","")("장비 이슈 "+(s.issues.length-3)+"건 더","전체 보기 →")]:[])));
+  return h+g.join("")+'</section>';
 }
 
-function render(v,a){
+function group(title,rows){return '<div class="grp"><h3>'+title+'</h3><ul class="todo">'+rows.join("")+'</ul></div>'}
+var ERRMSG={
+  old:"Apps Script를 새 버전으로 바꿔야 대시보드가 보여요. 저장소의 apps-script 폴더 코드로 바꾸고 ‘배포 관리 → 편집 → 새 버전’으로 배포해 주세요.",
+  slow:"웹앱이 응답하지 않아요.",
+  fail:"웹앱에 연결하지 못했어요."
+};
+function render(){
   var h='<header class="top"><h1>RAIM 업무 대시보드<small>'+md(TODAY)+' · 오늘 챙길 일</small></h1><span><button type="button" class="linkbtn" data-act="copylink">연결 링크 복사</button> <button type="button" class="linkbtn" data-act="setup">연결 설정</button></span></header>';
-  if(v.code==="auth"||a.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
-  if(!v.ok&&!a.ok)h+='<div class="banner">웹앱에 연결하지 못했어요. 연결 설정을 확인해 주세요.</div>';
-  // 보드 전용 코드면 열 수 없는 보드는 빼고 보여 줘요
-  h+='<div class="boards">'+(v.code==="forbidden"?"":volHTML(v))+(a.code==="forbidden"?"":atHTML(a))+'</div>';
+  if(ERR)h+='<div class="banner">'+esc(ERRMSG[ERR])+(DATA&&ERR!=="old"?' 마지막으로 불러온 내용을 보여 드려요.':'')+' <button type="button" class="linkbtn" data-act="retry">다시 시도</button></div>';
+  if(DATA)h+='<div class="boards">'+(DATA.volunteer?volHTML(DATA.volunteer):"")+(DATA.atelier?atHTML(DATA.atelier):"")+'</div>';
+  else if(!ERR)h+='<p class="boot">불러오는 중…</p>';
   document.getElementById("app").innerHTML=h;
 }
 function showSetup(msg){
   var a=API||{url:"",token:""};
-  document.getElementById("app").innerHTML='<div class="setup"><h1>RAIM 업무 대시보드 연결</h1><p>구글 시트에 배포한 웹앱 주소와 접속 코드를 넣어주세요. 이 브라우저에만 저장되고, 자원봉사·아뜰리에 보드에도 같이 적용돼요.</p>'+(msg?'<div class="banner">'+esc(msg)+'</div>':'')+'<form id="setupform" class="setup-f" autocomplete="off"><label for="su-url">웹앱 주소</label><input id="su-url" type="url" required placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(a.url)+'"><label for="su-token">접속 코드</label><input id="su-token" type="text" required value="'+esc(a.token)+'"><button type="submit" class="btn">연결</button></form></div>';
+  document.getElementById("app").innerHTML='<div class="setup"><h1>RAIM 업무 대시보드 연결</h1><p>구글 시트에 배포한 웹앱 주소와 접속 코드를 넣어주세요. 이 브라우저에만 저장되고, 자원봉사·아뜰리에 보드에도 같이 적용돼요. 연결 링크를 받았다면 링크를 열기만 하면 돼요.</p>'+(msg?'<div class="banner">'+esc(msg)+'</div>':'')+'<form id="setupform" class="setup-f" autocomplete="off"><label for="su-url">웹앱 주소</label><input id="su-url" type="url" required placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(a.url)+'"><label for="su-token">접속 코드</label><input id="su-token" type="text" required value="'+esc(a.token)+'"><button type="submit" class="btn">연결</button></form></div>';
 }
-/* the two boards keep their last copy in this browser; show that right away, then check the sheet */
-function readC(key){try{var c=JSON.parse(localStorage.getItem(key)||"null");if(c&&c.url===API.url&&c.state)return c}catch(e){}return null}
-function writeC(key,obj){try{var c=readC(key);if(c&&(c.dirty||(c.pending&&c.pending.length)))return;localStorage.setItem(key,JSON.stringify(obj))}catch(e){}}
+var busy=false;
 function load(){
   if(!API){showSetup();return}
-  var cv=readC("raim-cache"),ca=readC("raim-cache-atelier");
-  var V=cv&&{ok:true,board:"volunteer",version:cv.version,state:cv.state,lime:cv.lime};
-  var A=ca&&{ok:true,board:"atelier",version:ca.version,closedVersion:ca.closedVersion,state:ca.state,closed:ca.closed};
-  if(V&&A)render(V,A);
-  Promise.all([get("",V?"&v="+V.version:""),get("atelier",A?"&v="+A.version+"&cv="+(A.closedVersion||0):"")]).then(function(r){
-    var v=r[0],a=r[1];
-    if(v.ok&&v.same){V.lime=v.lime||V.lime;v=V}
-    else if(v.ok&&v.state)writeC("raim-cache",{url:API.url,version:v.version,state:v.state,lime:v.lime||[],dirty:false});
-    if(a.ok&&a.same)a=A;
-    else if(a.ok&&a.board==="atelier"&&a.state)writeC("raim-cache-atelier",{url:API.url,version:a.version,closedVersion:a.closedVersion||0,state:a.state,closed:a.closed||{},pending:[]});
-    if(v.code==="forbidden")try{localStorage.removeItem("raim-cache")}catch(x){}
-    if(a.code==="forbidden")try{localStorage.removeItem("raim-cache-atelier")}catch(x){}
-    if(!v.ok&&V&&v.code!=="auth"&&v.code!=="forbidden")v=V;
-    if(!a.ok&&A&&a.code!=="auth"&&a.code!=="forbidden")a=A;
-    render(v,a);
-  });
+  if(busy)return;busy=true;
+  TODAY=keyOf(new Date());
+  var c=readC();if(c&&!DATA)DATA=c.data;
+  ERR="";render();
+  RAIM.fetchJSON(RAIM.url(API,"action=summary"+(c?"&sv="+encodeURIComponent(c.key):""))).then(function(res){
+    busy=false;
+    if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
+    if(!res||!res.ok){ERR=res&&res.code==="bad_request"?"old":"fail";render();return}
+    if(!res.same){DATA=res;try{localStorage.setItem(CK,JSON.stringify({url:API.url,tok:API.token,key:res.key,data:res}))}catch(e){}}
+    render();
+  },function(err){busy=false;ERR=err&&err.message==="timeout"?"slow":"fail";render()});
 }
-document.addEventListener("click",function(e){var t=e.target.closest("[data-act=setup]");if(t)showSetup()});
+document.addEventListener("click",function(e){
+  var t=e.target.closest("[data-act]");if(!t)return;
+  if(t.dataset.act==="setup")showSetup();
+  if(t.dataset.act==="retry")load();
+});
 document.addEventListener("submit",function(e){
   if(e.target.id!=="setupform")return;e.preventDefault();
   API={url:document.getElementById("su-url").value.trim(),token:document.getElementById("su-token").value.trim()};
-  try{localStorage.setItem("raim-api",JSON.stringify(API))}catch(x){}
-  document.getElementById("app").innerHTML='<p class="boot">불러오는 중…</p>';load();
+  RAIM.setApi(API);DATA=null;load();
 });
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&API)load()});
 load();
