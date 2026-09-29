@@ -26,6 +26,8 @@ const 보드CONFIG = {
   아뜰리에알림시: 9,                 // 아뜰리에 아침 알림 (운영일만)
 };
 
+const 보드_설정탭명 = '보드_설정';        // 배치 규칙·라메 명단 (항목 | 값(JSON))
+const 보드_설정헤더 = ['항목', '값'];
 const 보드_기록헤더 = ['id', '날짜', '시간대', '봉사자', '휴대폰', '배치', '로공방모집', '고정', '출석', '1365입력', '메모'];
 const 보드_날짜헤더 = ['날짜', '명단확인', '휴관', '로공방운영', '공지추가', '확인항목'];
 // 기존 열_찾기()가 인식하는 헤더 이름 (봉사자성명 / 휴대폰 / 활동일자 / 시작시간 / 미승인)
@@ -44,17 +46,19 @@ function doGet(e) {
     const perm = 보드_권한_(p.token);
     if (!perm) return 보드_json_({ ok: false, code: 'auth' });
     if (p.action === 'codes') return 보드_json_(보드_공유코드_(p.token));
+    if (p.action === 'summary') return 보드_json_(보드_요약_(perm, p.sv));
     if (!perm[p.board === 'atelier' ? 'atelier' : 'volunteer']) return 보드_json_({ ok: false, code: 'forbidden' });
     // 보드가 가진 판(v)과 같으면 내용 없이 same 만 돌려줍니다. 가장 흔하고 가장 빠른 경우예요.
     if (p.action === 'load' && p.board === 'atelier') {
       const version = 아뜰리에_버전_();
       const closedVersion = 보드_버전_();   // 휴관 정보는 자원봉사 보드 데이터에서 옵니다
       if (p.v !== undefined && Number(p.v) === version && Number(p.cv) === closedVersion) {
-        return 보드_json_({ ok: true, board: 'atelier', version, closedVersion, same: true });
+        return 보드_json_({ ok: true, board: 'atelier', version, closedVersion, same: true, patch: 1 });
       }
       return 보드_json_({
         ok: true,
         board: 'atelier',
+        patch: 1,   // 이 웹앱은 바뀐 부분만 받아 저장할 수 있어요
         version,
         closedVersion,
         state: 보드_캐시_('ATELIER', version, 아뜰리에_불러오기_),
@@ -65,11 +69,12 @@ function doGet(e) {
       const version = 보드_버전_();
       const lime = 보드_라메명단_캐시_();
       if (p.v !== undefined && Number(p.v) === version) {
-        return 보드_json_({ ok: true, board: 'volunteer', version, same: true, lime });
+        return 보드_json_({ ok: true, board: 'volunteer', version, same: true, lime, patch: 1 });
       }
       return 보드_json_({
         ok: true,
         board: 'volunteer',
+        patch: 1,
         version,
         state: 보드_캐시_('BOARD', version, 보드_불러오기_),
         lime,
@@ -102,8 +107,23 @@ function doPost(e) {
     if (Number(body.baseVersion) !== current) {
       return 보드_json_({ ok: false, code: 'conflict', version: current });
     }
-    if (atelier) 아뜰리에_저장_(body.state || {});
-    else 보드_저장_(body.state || {});
+    // patch = 바뀐 부분만 (자원봉사: 날짜별, 아뜰리에: 목록별). 판이 같으니 지금 시트 내용 + 바뀐 부분 = 보드 내용
+    if (!body.patch && !body.state) return 보드_json_({ ok: false, code: 'bad_request' });
+    if (atelier) {
+      if (body.patch) {
+        const lists = body.patch.lists || {};
+        const s = 보드_캐시_('ATELIER', current, 아뜰리에_불러오기_);
+        Object.keys(lists).forEach(k => { if (아뜰리에_탭[k]) s[k] = lists[k]; });
+        if (body.patch.seeded) s.seeded = true;
+        아뜰리에_저장_(s, Object.keys(lists));
+      } else 아뜰리에_저장_(body.state);
+    } else if (body.patch) {
+      const s = 보드_캐시_('BOARD', current, 보드_불러오기_);
+      const days = body.patch.days || {};
+      Object.keys(days).forEach(k => { if (days[k]) s.days[k] = days[k]; else delete s.days[k]; });
+      if (body.patch.settings) s.settings = body.patch.settings;
+      보드_저장_(s);
+    } else 보드_저장_(body.state);
     const next = current + 1;
     PropertiesService.getScriptProperties().setProperty(versionKey, String(next));
     return 보드_json_({ ok: true, version: next });
@@ -112,6 +132,34 @@ function doPost(e) {
   } finally {
     try { lock.releaseLock(); } catch (x) {}
   }
+}
+
+/**
+ * 대시보드용 요약: 숫자와 할 일 목록만 보냅니다 (보드 전체·봉사자 연락처는 보내지 않음).
+ * sv가 지금 판과 같으면 same만 돌려줘요. 판 = 두 보드 판 + 휴관 판 + 오늘 날짜
+ */
+function 보드_요약_(perm, sv) {
+  const today = 보드_오늘_();
+  // 휴관 정보는 자원봉사 판에 들어 있어서, 아뜰리에만 보는 코드도 자원봉사 판이 바뀌면 다시 계산해요
+  const key = [보드_버전_(), perm.atelier ? 아뜰리에_버전_() : '-', perm.volunteer ? 'v' : '', today].join('.');
+  if (sv === key) return { ok: true, same: true, key };
+  const out = { ok: true, key, today };
+  if (perm.volunteer) {
+    const days = 보드_캐시_('BOARD', 보드_버전_(), 보드_불러오기_).days;
+    const closedToday = 보드_휴관인지_(days, today);
+    let noAtt = 0;
+    let entry = 0;
+    Object.keys(days).forEach(k => {
+      if (보드_휴관인지_(days, k)) return;
+      days[k].vols.forEach(v => {
+        if (k <= today && v.attend == null) noAtt += 1;
+        if (v.attend === 'o' && !v.entered) entry += 1;
+      });
+    });
+    out.volunteer = { closedToday, todayN: !closedToday && days[today] ? days[today].vols.length : 0, noAtt, entry };
+  }
+  if (perm.atelier) out.atelier = 아뜰리에_요약_(today);
+  return out;
 }
 
 function 보드_json_(obj) {
@@ -203,15 +251,31 @@ function 보드_시트_(name, header) {
   return sheet;
 }
 
+/**
+ * 탭 내용을 rows로 맞춥니다. 시트 쓰기가 가장 느려서, 지금 내용과 비교해 처음 달라지는 줄부터만 다시 씁니다
+ * (보통 최근 날짜만 바뀌므로 몇 줄만 씀). 같으면 아무것도 쓰지 않아요.
+ */
 function 보드_덮어쓰기_(sheet, header, rows) {
   const width = header.length;
-  const oldRows = Math.max(sheet.getLastRow() - 1, 1);
-  sheet.getRange(2, 1, oldRows, Math.max(width, sheet.getLastColumn())).clearContent();
-  sheet.getRange(1, 1, 1, width).setValues([header]).setFontWeight('bold');
-  if (rows.length) {
-    const range = sheet.getRange(2, 1, rows.length, width);
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(width, sheet.getLastColumn());
+  const old = lastRow > 0 ? sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues() : [];
+  const sameRow = (o, r) => {
+    if (!o) return false;
+    for (let c = 0; c < lastCol; c += 1) {
+      if (String(o[c] == null ? '' : o[c]) !== (c < width ? String(r[c] == null ? '' : r[c]) : '')) return false;
+    }
+    return true;
+  };
+  if (!sameRow(old[0], header)) sheet.getRange(1, 1, 1, width).setValues([header]).setFontWeight('bold');
+  let first = 0;
+  while (first < rows.length && sameRow(old[first + 1], rows[first])) first += 1;
+  if (first === rows.length && lastRow - 1 <= rows.length) return;
+  if (lastRow >= first + 2) sheet.getRange(first + 2, 1, lastRow - first - 1, lastCol).clearContent();
+  if (first < rows.length) {
+    const range = sheet.getRange(first + 2, 1, rows.length - first, width);
     range.setNumberFormat('@');   // 날짜·전화번호가 숫자로 바뀌거나 메모가 수식으로 읽히지 않게
-    range.setValues(rows);
+    range.setValues(rows.slice(first));
   }
 }
 
@@ -268,12 +332,7 @@ function 보드_불러오기_() {
     });
   });
 
-  let settings = {};
-  try {
-    settings = JSON.parse(PropertiesService.getScriptProperties().getProperty('BOARD_SETTINGS') || '{}');
-  } catch (err) {}
-
-  return { v: 2, days, settings };
+  return { v: 2, days, settings: 보드_설정읽기_() };
 }
 
 function 보드_저장_(state) {
@@ -316,8 +375,27 @@ function 보드_저장_(state) {
     .map(r => [r[3], r[4], r[1], r[2], r[8] === '결석' ? '1' : '', r[5], r[8]]);
   보드_덮어쓰기_(보드_시트_(보드CONFIG.입력탭명, 보드_입력헤더), 보드_입력헤더, inputRows);
 
-  const settings = Object.assign({}, state.settings || {});
-  PropertiesService.getScriptProperties().setProperty('BOARD_SETTINGS', JSON.stringify(settings));
+  const settings = state.settings || {};
+  보드_덮어쓰기_(보드_시트_(보드_설정탭명, 보드_설정헤더), 보드_설정헤더,
+    Object.keys(settings).sort().map(k => [k, JSON.stringify(settings[k])]));
+}
+
+/**
+ * 배치 규칙·라메 명단. 예전에는 스크립트 속성(값 하나 약 9KB 한도)에 두었는데, 명단이 길어지면 저장이 실패할 수 있어
+ * '보드_설정' 탭으로 옮겼습니다. 탭이 비어 있으면 예전 속성에서 읽어요 (다음 저장 때 탭으로 옮겨짐).
+ */
+function 보드_설정읽기_() {
+  const settings = {};
+  보드_시트_(보드_설정탭명, 보드_설정헤더).getDataRange().getDisplayValues().slice(1).forEach(r => {
+    if (!r[0]) return;
+    try { settings[r[0]] = JSON.parse(r[1]); } catch (err) {}
+  });
+  if (Object.keys(settings).length) return settings;
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty('BOARD_SETTINGS') || '{}');
+  } catch (err) {
+    return {};
+  }
 }
 
 /** 기존 '라임메이트' 탭의 이름 열을 읽습니다. */
@@ -358,6 +436,7 @@ function 보드_설치() {
   보드_시트_(보드CONFIG.기록탭명, 보드_기록헤더);
   보드_시트_(보드CONFIG.날짜탭명, 보드_날짜헤더);
   보드_시트_(보드CONFIG.입력탭명, 보드_입력헤더);
+  보드_시트_(보드_설정탭명, 보드_설정헤더);
   아뜰리에_탭만들기_();
   보드_알림설치();
 

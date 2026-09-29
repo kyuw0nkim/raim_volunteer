@@ -79,8 +79,11 @@ function 아뜰리에_불러오기_() {
   return state;
 }
 
-function 아뜰리에_저장_(state) {
-  Object.keys(아뜰리에_탭).forEach(key => 아뜰리에_쓰기_(아뜰리에_탭[key], state[key]));
+/** keys를 주면 그 목록의 탭만 씁니다 (바뀐 부분만 받은 저장) */
+function 아뜰리에_저장_(state, keys) {
+  (keys || Object.keys(아뜰리에_탭)).forEach(key => {
+    if (아뜰리에_탭[key]) 아뜰리에_쓰기_(아뜰리에_탭[key], state[key]);
+  });
   if (state.seeded) PropertiesService.getScriptProperties().setProperty('ATELIER_SEEDED', '1');
 }
 
@@ -162,4 +165,35 @@ function 아뜰리에_알림_아침() {
   }
 
   if (lines.length) 보드_메일_('오늘 할 일', lines, '[RAIM 아뜰리에]', 'atelier/');
+}
+
+/** 대시보드용 요약 (보드.gs 보드_요약_에서 부름) */
+function 아뜰리에_요약_(today) {
+  const s = 보드_캐시_('ATELIER', 아뜰리에_버전_(), 아뜰리에_불러오기_);
+  const closed = 보드_캐시_('CLOSED', 보드_버전_(), 아뜰리에_휴관지정_);
+  const todo = [];
+  s.tasks.forEach(t => {
+    const dates = s.logs.filter(l => l.task === t.id).map(l => l.date).sort();
+    if (dates.indexOf(today) >= 0) return;
+    if (t.flagDate) { todo.push({ name: t.name, txt: '필요해요', hot: true }); return; }
+    const last = dates.length ? dates[dates.length - 1] : '';
+    if (t.type === '주기') {
+      const due = 아뜰리에_다음예정_(t, s.logs, closed, today).due;
+      const dd = 아뜰리에_지난일수_(today, due);
+      if (dd < 0) todo.push({ name: t.name, txt: (-dd) + '일 지남', hot: true });
+      else if (dd === 0) todo.push({ name: t.name, txt: '오늘', hot: true });
+      else if (dd <= 2) todo.push({ name: t.name, txt: 'D-' + dd });
+      return;
+    }
+    const warn = Number(t.warn);
+    if (t.warn === '' || !warn || (t.snooze && t.snooze > today)) return;
+    if (!last || 아뜰리에_지난일수_(last, today) >= warn) todo.push({ name: t.name, txt: '제안' });
+  });
+  const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
+  const low = s.items.filter(i => num(i.min) != null && num(i.qty) != null && num(i.qty) <= num(i.min))
+    .map(i => ({ name: i.name, qty: i.qty, unit: i.unit }));
+  const issues = s.issues.filter(i => i.status !== '해결').map(i => ({ equip: i.equip, text: i.text, date: i.date }));
+  const checks = s.checks.filter(c => c.date === today);
+  const ck = s.checkItems.filter(it => checks.some(c => c.kind === it.kind && c.label === it.label)).length;
+  return { todo, low, issues, ck, ckOf: s.checkItems.length, closedToday: 아뜰리에_휴관인지_(closed, today) };
 }

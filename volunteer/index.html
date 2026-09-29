@@ -281,6 +281,7 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 </head>
 <body>
 <div id="app"><p class="boot">불러오는 중…</p></div>
+<script src="../common.js?v=1"></script>
 <script>
 (function(){
 "use strict";
@@ -447,27 +448,7 @@ function keepUI(){try{var s=JSON.stringify(UI);localStorage.setItem("raim-ui",s)
 var restoreY=null;try{restoreY=+sessionStorage.getItem("raim-scroll");sessionStorage.removeItem("raim-scroll")}catch(e){}
 
 /* ---------- sync with the Google Sheet (Apps Script web app) ---------- */
-var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-/* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
-(function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
-/* 연결 링크 복사: data-board 보드의 전용 코드를 웹앱에서 받아 링크를 만들어요.
-   전체 코드가 있는 기기에서만 전용 코드를 받을 수 있고, 아니면 이 기기 코드(이미 전용) 그대로 */
-document.addEventListener("click",function(e){
-  var b=e.target.closest("[data-act=copylink]");if(!b||!API||b.disabled)return;
-  var want=b.dataset.board||"",label0=b.textContent;
-  b.disabled=true;b.textContent="링크 만드는 중…";
-  fetch(API.url+(API.url.indexOf("?")<0?"?":"&")+"action=codes&token="+encodeURIComponent(API.token)).then(function(r){return r.json()}).catch(function(){return null}).then(function(res){
-    b.disabled=false;b.textContent=label0;
-    var tok=API.token,what="?";
-    if(res&&res.ok){if(res.full&&want&&res[want]){tok=res[want];what=want}else what=res.full?"all":(res.scope||[]).join(",")}
-    var name={all:"전체 권한(두 보드 모두)",volunteer:"자원봉사 보드 전용",atelier:"아뜰리에 보드 전용"}[what]||"이 기기와 같은 권한";
-    var root=location.pathname.replace(/\/(volunteer|atelier)\/(index\.html)?$/,"/").replace(/index\.html$/,"");
-    var s=location.origin+root+({volunteer:"volunteer/",atelier:"atelier/"}[what]||"")+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(tok);
-    var manual=function(){window.prompt(name+" 연결 링크예요. 복사해서 공유하세요."+(what==="?"?" (Apps Script가 예전 버전이라 전용 링크를 못 만들었어요. 이 기기 코드가 그대로 들어가요.)":""),s)};
-    if(what==="?"){manual();return}
-    try{navigator.clipboard.writeText(s).then(function(){b.textContent="복사됨 · "+name},manual)}catch(x){manual()}
-  });
-});
+var API=RAIM.api;   // 연결 정보·연결 링크·링크 복사는 common.js
 var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false,retries=0;
 /* BASE = what the sheet had when we last loaded or saved. If someone else saves first, the sheet rejects
    our save; we then fetch their version and merge: whatever we changed since BASE wins, everything else
@@ -529,7 +510,17 @@ function loadURL(withV){return API.url+(API.url.indexOf("?")<0?"?":"&")+"action=
 /* the last copy is kept in this browser so the board opens instantly; the sheet is checked right after */
 var CACHEKEY="raim-cache";
 function readCache(){try{var c=JSON.parse(localStorage.getItem(CACHEKEY)||"null");if(c&&API&&c.url===API.url&&c.state)return c}catch(e){}return null}
-function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,base:BASE,lime:LIME,dirty:DIRTY}))}catch(e){}}
+function writeCache(){clearTimeout(cacheT);cacheT=null;if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,base:BASE,lime:LIME,dirty:DIRTY,patch:PATCH}))}catch(e){}}
+/* while typing, copying the whole board into localStorage on every key gets slow as records pile up: wait for a pause */
+var cacheT=null;function cacheSoon(){if(!cacheT)cacheT=setTimeout(writeCache,600)}
+/* the web app accepts only the days that changed (patch) — older web apps need the whole board */
+var PATCH=false;
+function patchOf(){
+  var B=BASE||{},bd=B.days||{},days={},n=0;
+  keysOf(bd,S.days).forEach(function(k){if(!same(bd[k],S.days[k])){days[k]=S.days[k]||null;n++}});
+  var o={days:days};if(!same(B.settings,S.settings))o.settings=S.settings;
+  return o;
+}
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function saveHTML(){
   var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",merging:"다른 기기 변경과 합치는 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"합치지 못했어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
@@ -537,22 +528,24 @@ function saveHTML(){
   var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",merging:"saving",newer:"pending"}[saveState]||saveState;
   return '<span class="save" id="save" data-s="'+s+'" role="status"><i></i>'+t+btn+'</span>';
 }
-function touch(){if(saveState==="conflict")retries=0;DIRTY=true;writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
+function touch(){if(saveState==="conflict")retries=0;DIRTY=true;cacheSoon();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
 function save(){
   clearTimeout(saveTimer);saveTimer=null;
   if(!API||!loaded||saveState==="conflict")return;
   if(inflight){again=true;return}
   inflight=true;setSave("saving");
   var sent=JSON.stringify(S);
-  fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:'{"token":'+JSON.stringify(API.token)+',"action":"save","baseVersion":'+VERSION+',"state":'+sent+'}'})
-  .then(function(r){return r.json()}).then(function(res){
+  var data=PATCH&&BASE?'"patch":'+JSON.stringify(patchOf()):'"state":'+sent;
+  RAIM.fetchJSON(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:'{"token":'+JSON.stringify(API.token)+',"action":"save","baseVersion":'+VERSION+','+data+'}'},30000)
+  .then(function(res){
     if(res&&res.ok){inflight=false;retries=0;VERSION=res.version;BASE=JSON.parse(sent);if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
     if(res&&res.code==="conflict"&&retries<4){
       // someone else saved first: take their version, put our changes on top, try again
       retries++;setSave("merging");
-      return fetch(loadURL(false)).then(function(r){return r.json()}).then(function(r2){
+      return RAIM.fetchJSON(loadURL(false)).then(function(r2){
         inflight=false;again=false;
         if(!r2||!r2.ok||!r2.state){setSave("error");return}
+        PATCH=r2.patch===1;
         rebase(r2);save();
       });
     }
@@ -569,8 +562,9 @@ function applyServer(res){initState(res.state);BASE=clone(res.state);VERSION=res
 function load(bg){
   if(!API){showSetup();return}
   if(!bg&&loaded)setSave("loading");
-  fetch(loadURL(bg&&loaded)).then(function(r){return r.json()}).then(function(res){
+  RAIM.fetchJSON(loadURL(bg&&loaded)).then(function(res){
     if(res&&res.code==="forbidden"){noAccess();return}
+    if(res&&res.ok)PATCH=res.patch===1;
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(!res||!res.ok){
       if(loaded){setSave(bg?(saveState==="checking"?"offline":saveState):"error");return}
@@ -587,9 +581,9 @@ function load(bg){
     }
     if(res.same){load(false);return}
     applyServer(res);saveState="idle";render();
-  },function(){
+  },function(err){
     if(loaded){setSave(bg?"offline":"error");return}
-    showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
+    showSetup(err&&err.message==="timeout"?"웹앱이 응답하지 않아요. 잠시 뒤 다시 연결해 보세요.":"웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
 /* 보드 전용 접속 코드로 다른 보드를 열었을 때 */
@@ -600,9 +594,10 @@ function showSetup(msg){
   document.getElementById("app").innerHTML='<a class="crumb" href="../">← RAIM 업무 대시보드</a><div class="setup"><h1>RAIM 자원봉사 보드 연결</h1><p>구글 시트에 배포한 웹앱 주소와 접속 코드를 넣어주세요. 이 브라우저에만 저장되고, 기기마다 한 번씩 입력하면 돼요.</p>'+(msg?'<div class="banner">'+esc(msg)+'</div>':'')+'<form id="setupform" class="setup-f" autocomplete="off"><label for="su-url">웹앱 주소</label><input id="su-url" type="url" required placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(a.url)+'"><label for="su-token">접속 코드</label><input id="su-token" type="text" required value="'+esc(a.token)+'"><button type="submit" class="btn primary big">연결</button></form></div>';
 }
 document.addEventListener("visibilitychange",function(){
-  if(document.visibilityState==="hidden"&&saveTimer)save();
+  if(document.visibilityState==="hidden"){if(cacheT)writeCache();if(saveTimer)save()}
   if(document.visibilityState==="visible"&&loaded&&!saveTimer&&!inflight&&saveState!=="conflict"){if(saveState==="idle")setSave("checking");load(true)}
 });
+window.addEventListener("pagehide",function(){if(cacheT)writeCache()});
 window.addEventListener("beforeunload",function(e){if(saveTimer||inflight||Object.keys(QD).length){e.preventDefault();e.returnValue=""}});
 
 /* ---------- notice text ---------- */
@@ -634,16 +629,14 @@ function notice(k){
 
 /* ---------- to-do lists ---------- */
 function todo(){
-  var keys=Object.keys(S.days).sort();
-  var start=keys.length?keys[0]:TODAY;
   var end=keyOf(addDays(dateOf(TODAY),7));
   var attend=[],entry=[];
-  for(var d=dateOf(start);keyOf(d)<=end;d=addDays(d,1)){
-    var k=keyOf(d);if(isClosed(k))continue;var day=peek(k);
+  Object.keys(S.days).sort().forEach(function(k){
+    if(k>end||isClosed(k))return;var day=S.days[k];
     if(k<=TODAY)day.vols.forEach(function(v){if(v.attend==null)attend.push([k,v])});
     var pend=day.vols.filter(function(v){return v.attend==="o"&&!v.entered});
     if(pend.length)entry.push([k,pend]);
-  }
+  });
   return {attend:attend,entry:entry};
 }
 
@@ -928,7 +921,7 @@ app.addEventListener("submit",function(e){
 (function boot(){
   var c=API&&readCache();
   if(!c){load(false);return}
-  initState(c.state);VERSION=c.version||0;LIME=c.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=!!c.dirty;
+  initState(c.state);VERSION=c.version||0;LIME=c.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=!!c.dirty;PATCH=c.patch===true;
   // older caches have no base: then unsaved changes here win everywhere when merging
   BASE=c.base||(DIRTY?{days:{},settings:{}}:clone(c.state));
   saveState=DIRTY?"pending":"checking";render();

@@ -248,6 +248,7 @@ dialog.dlg::backdrop{background:rgba(12,36,59,.35)}
 </head>
 <body>
 <div id="app"><p class="boot">불러오는 중…</p></div>
+<script src="../common.js?v=1"></script>
 <script>
 (function(){
 "use strict";
@@ -288,7 +289,18 @@ function byId(L,id){for(var i=0;i<L.length;i++)if(L[i].id===id)return L[i];retur
 
 /* ---------- state ---------- */
 var S={},CLOSED={};
-function norm(s){S=s||{};LISTS.forEach(function(k){if(!Array.isArray(S[k]))S[k]=[]})}
+function norm(s){S=s||{};IDX=null;LISTS.forEach(function(k){if(!Array.isArray(S[k]))S[k]=[]})}
+/* lookups by task / date, built once after each change instead of scanning every log per task and per calendar cell */
+var IDX=null;
+function idx(){
+  if(IDX)return IDX;
+  var I={byTask:{},byDate:{},issuesByDate:{},check:{}};
+  S.logs.forEach(function(l){(I.byTask[l.task]=I.byTask[l.task]||[]).push(l);(I.byDate[l.date]=I.byDate[l.date]||[]).push(l)});
+  Object.keys(I.byTask).forEach(function(k){I.byTask[k].sort(function(a,b){return a.date<b.date?-1:1})});
+  S.issues.forEach(function(x){(I.issuesByDate[x.date]=I.issuesByDate[x.date]||[]).push(x)});
+  S.checks.forEach(function(c){I.check[c.date+"\n"+c.kind+"\n"+c.label]=c});
+  return IDX=I;
+}
 norm({});
 function isClosed(k){if(typeof CLOSED[k]==="boolean")return CLOSED[k];return dateOf(k).getDay()===1}
 function nextOpen(k){for(var i=0;i<14&&isClosed(k);i++)k=addDays(k,1);return k}
@@ -298,6 +310,7 @@ function checkLabels(kind){return S.checkItems.filter(function(c){return c.kind=
    if someone else saved first — so two people on their phones don't overwrite each other */
 function upsert(L,o){var x=byId(L,o.id);if(x){Object.keys(o).forEach(function(k){x[k]=o[k]})}else L.push(JSON.parse(JSON.stringify(o)))}
 function apply(op){
+  IDX=null;
   switch(op.t){
     case "seed":
       if(S.seeded)break;
@@ -367,43 +380,29 @@ function ask(o){
 }
 
 /* ---------- sync ---------- */
-var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-/* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
-(function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
-/* 연결 링크 복사: data-board 보드의 전용 코드를 웹앱에서 받아 링크를 만들어요.
-   전체 코드가 있는 기기에서만 전용 코드를 받을 수 있고, 아니면 이 기기 코드(이미 전용) 그대로 */
-document.addEventListener("click",function(e){
-  var b=e.target.closest("[data-act=copylink]");if(!b||!API||b.disabled)return;
-  var want=b.dataset.board||"",label0=b.textContent;
-  b.disabled=true;b.textContent="링크 만드는 중…";
-  fetch(API.url+(API.url.indexOf("?")<0?"?":"&")+"action=codes&token="+encodeURIComponent(API.token)).then(function(r){return r.json()}).catch(function(){return null}).then(function(res){
-    b.disabled=false;b.textContent=label0;
-    var tok=API.token,what="?";
-    if(res&&res.ok){if(res.full&&want&&res[want]){tok=res[want];what=want}else what=res.full?"all":(res.scope||[]).join(",")}
-    var name={all:"전체 권한(두 보드 모두)",volunteer:"자원봉사 보드 전용",atelier:"아뜰리에 보드 전용"}[what]||"이 기기와 같은 권한";
-    var root=location.pathname.replace(/\/(volunteer|atelier)\/(index\.html)?$/,"/").replace(/index\.html$/,"");
-    var s=location.origin+root+({volunteer:"volunteer/",atelier:"atelier/"}[what]||"")+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(tok);
-    var manual=function(){window.prompt(name+" 연결 링크예요. 복사해서 공유하세요."+(what==="?"?" (Apps Script가 예전 버전이라 전용 링크를 못 만들었어요. 이 기기 코드가 그대로 들어가요.)":""),s)};
-    if(what==="?"){manual();return}
-    try{navigator.clipboard.writeText(s).then(function(){b.textContent="복사됨 · "+name},manual)}catch(x){manual()}
-  });
-});
+var API=RAIM.api;   // 연결 정보·연결 링크·링크 복사는 common.js
 var VERSION=0,CLOSEDV=0,pending=[],saveState="idle",saveTimer=null,inflight=false,loaded=false,retries=0;
 /* the last copy (and any changes not yet saved) is kept in this browser so the board opens instantly */
 var CACHEKEY="raim-cache-atelier";
 function readCache(){try{var c=JSON.parse(localStorage.getItem(CACHEKEY)||"null");if(c&&API&&c.url===API.url&&c.state)return c}catch(e){}return null}
-function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,closedVersion:CLOSEDV,state:S,closed:CLOSED,pending:pending}))}catch(e){}}
+function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,closedVersion:CLOSEDV,state:S,closed:CLOSED,pending:pending,base:BASEJ,patch:PATCH}))}catch(e){}}
+/* BASEJ = each list as the sheet had it at the last load/save. Saves send only the lists that changed since
+   (patch); web apps that don't know patches (PATCH false) get the whole board */
+var PATCH=false,BASEJ=null;
+function snap(){var o={seeded:!!S.seeded};LISTS.forEach(function(k){o[k]=JSON.stringify(S[k])});return o}
 function saveHTML(){
   var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",checking:"최신 내용 확인 중…"}[saveState]||"";
   return '<span class="save" id="save" data-s="'+(saveState==="checking"?"saving":saveState)+'" role="status"><i></i>'+t+(saveState==="error"?' <button type="button" data-act="savenow">다시 저장</button>':'')+'</span>';
 }
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function dispatch(op){apply(op);pending.push(op);writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,800);soon()}
-function post(){return fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API.token,board:"atelier",action:"save",baseVersion:VERSION,state:S})}).then(function(r){return r.json()})}
-function fetchState(bg){
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&board=atelier&token="+encodeURIComponent(API.token)+(bg?"&v="+VERSION+"&cv="+CLOSEDV:"");
-  return fetch(u).then(function(r){return r.json()});
+function post(){
+  var now=snap(),head='{"token":'+JSON.stringify(API.token)+',"board":"atelier","action":"save","baseVersion":'+VERSION+',',body;
+  if(PATCH&&BASEJ)body=head+'"patch":{"seeded":'+now.seeded+',"lists":{'+LISTS.filter(function(k){return now[k]!==BASEJ[k]}).map(function(k){return '"'+k+'":'+now[k]}).join(",")+'}}}';
+  else body=head+'"state":'+JSON.stringify(S)+'}';
+  return RAIM.fetchJSON(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:body},30000).then(function(res){if(res&&res.ok)BASEJ=now;return res});
 }
+function fetchState(bg){return RAIM.fetchJSON(RAIM.url(API,"action=load&board=atelier"+(bg?"&v="+VERSION+"&cv="+CLOSEDV:"")))}
 function save(){
   clearTimeout(saveTimer);saveTimer=null;
   if(!API||!loaded||!pending.length)return;
@@ -418,7 +417,7 @@ function save(){
       return fetchState().then(function(r2){
         inflight=false;
         if(!r2||!r2.ok||r2.board!=="atelier"){setSave("error");return}
-        norm(r2.state);CLOSED=r2.closed||{};VERSION=r2.version||0;CLOSEDV=r2.closedVersion||0;
+        norm(r2.state);CLOSED=r2.closed||{};VERSION=r2.version||0;CLOSEDV=r2.closedVersion||0;BASEJ=snap();PATCH=r2.patch===1;
         pending.forEach(apply);render();save();
       });
     }
@@ -432,18 +431,20 @@ function load(silent){
   if(!API){showSetup();return}
   fetchState(silent&&loaded).then(function(res){
     if(res&&res.code==="forbidden"){noAccess();return}
+    if(res&&res.ok)PATCH=res.patch===1;
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(silent&&loaded&&(!res||!res.ok||res.same)){if(saveState==="checking")setSave(pending.length?"pending":"idle");return}
     if(!res||!res.ok){if(silent&&loaded)return;showSetup(res&&res.code==="auth"?"접속 코드가 맞지 않아요.":"불러오지 못했어요: "+((res&&res.message)||"알 수 없는 오류"));return}
     if(res.board!=="atelier"){showSetup("웹앱이 아직 아뜰리에 보드를 모르는 버전이에요. 저장소의 apps-script 폴더 코드로 Apps Script를 바꾸고 ‘새 배포’ 해 주세요.");return}
     if(silent&&loaded&&res.version===VERSION&&(res.closedVersion||0)===CLOSEDV){if(saveState==="checking")setSave("idle");return}
     if(silent&&loaded&&pending.length)return;
-    norm(res.state);CLOSED=res.closed||{};VERSION=res.version||0;CLOSEDV=res.closedVersion||0;loaded=true;
+    norm(res.state);CLOSED=res.closed||{};VERSION=res.version||0;CLOSEDV=res.closedVersion||0;loaded=true;BASEJ=snap();
     pending.forEach(apply);writeCache();if(saveState==="checking")saveState="idle";
     if(!S.seeded){dispatch({t:"seed"});return}
     render();
-  },function(){
+  },function(err){
     if(loaded){if(saveState==="checking")setSave("idle");return}
+    if(err&&err.message==="timeout"){showSetup("웹앱이 응답하지 않아요. 잠시 뒤 다시 연결해 보세요.");return}
     showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
@@ -462,7 +463,7 @@ window.addEventListener("beforeunload",function(e){if(pending.length||inflight){
 /* ---------- derived ---------- */
 var ORDER={late:0,today:1,flag:2,soon:3,suggest:4,done:5,ok:6};
 function taskInfo(t){
-  var logs=S.logs.filter(function(l){return l.task===t.id}).sort(function(a,b){return a.date<b.date?-1:1});
+  var logs=idx().byTask[t.id]||[];
   var last=logs.length?logs[logs.length-1]:null,todayLog=logs.filter(function(l){return l.date===TODAY}).pop()||null;
   var o={t:t,last:last,todayLog:todayLog,s:"ok",txt:""};
   if(t.type==="주기"){
@@ -490,7 +491,7 @@ function taskInfo(t){
 function infos(){return S.tasks.map(taskInfo).sort(function(a,b){return ORDER[a.s]-ORDER[b.s]})}
 function lowItems(){return S.items.filter(function(i){var q=num(i.qty),m=num(i.min);return m!=null&&q!=null&&q<=m})}
 function openIssues(){return S.issues.filter(function(i){return i.status!=="해결"})}
-function checkOf(date,kind,label){for(var i=0;i<S.checks.length;i++){var c=S.checks[i];if(c.date===date&&c.kind===kind&&c.label===label)return c}return null}
+function checkOf(date,kind,label){return idx().check[date+"\n"+kind+"\n"+label]||null}
 function checkCount(date,kind){var L=checkLabels(kind);return {n:L.filter(function(l){return checkOf(date,kind,l)}).length,of:L.length}}
 
 /* ---------- UI state ---------- */
@@ -623,9 +624,9 @@ function calHTML(){
   for(var dd=1;dd<=last;dd++){
     var k=y+pad(m+1)+pad(dd),w=dateOf(k).getDay(),cl=isClosed(k);
     var ev=[];
-    S.logs.filter(function(l){return l.date===k}).forEach(function(l){ev.push('<span class="ev d">✓ '+esc(l.taskName||"")+'</span>')});
-    (P[k]||[]).forEach(function(p){if(!S.logs.some(function(l){return l.date===k&&l.task===p.t.id}))ev.push('<span class="ev p'+(p.late?" late":"")+'">'+esc(p.t.name)+'</span>')});
-    S.issues.filter(function(x){return x.date===k}).forEach(function(x){ev.push('<span class="ev i">! '+esc(x.equip||x.text)+'</span>')});
+    (idx().byDate[k]||[]).forEach(function(l){ev.push('<span class="ev d">✓ '+esc(l.taskName||"")+'</span>')});
+    (P[k]||[]).forEach(function(p){if(!(idx().byDate[k]||[]).some(function(l){return l.task===p.t.id}))ev.push('<span class="ev p'+(p.late?" late":"")+'">'+esc(p.t.name)+'</span>')});
+    (idx().issuesByDate[k]||[]).forEach(function(x){ev.push('<span class="ev i">! '+esc(x.equip||x.text)+'</span>')});
     var shown=ev.slice(0,3).join("")+(ev.length>3?'<span class="ev more">+'+(ev.length-3)+'</span>':'');
     var ck="";if(!cl&&k<=TODAY){var a=checkCount(k,"개관"),b=checkCount(k,"마감");if(a.n||b.n)ck='<span class="ck'+(a.n===a.of&&b.n===b.of?" all":"")+'">점검 '+(a.n+b.n)+'/'+(a.of+b.of)+'</span>'}
     h+='<button type="button" class="cell'+(w===0?" sun":w===6?" sat":"")+(cl?" closed":"")+(k===TODAY?" today":"")+(k===UI.sel?" sel":"")+'" data-act="sel" data-k="'+k+'" aria-label="'+md(k)+'"><span class="n">'+dd+'</span>'+shown+ck+'</button>';
@@ -636,7 +637,7 @@ function calHTML(){
 }
 function dayHTML(k,P){
   var h='<section class="card day"><h2>'+md(k)+(isClosed(k)?' <small>휴관일</small>':'')+'</h2>';
-  var logs=S.logs.filter(function(l){return l.date===k});
+  var logs=idx().byDate[k]||[];
   h+='<h3>한 일</h3>'+(logs.length?logs.map(function(l){return '<div class="rowline"><span class="grow">'+esc(l.taskName)+(l.memo?' <span class="s">· '+esc(l.memo)+'</span>':'')+'</span><span class="s">'+esc(l.by||"")+'</span><button type="button" class="btn ghost" data-act="memo" data-id="'+l.id+'">메모</button><button type="button" class="btn ghost'+(armed===l.id?" arm":"")+'" data-act="unlog" data-id="'+l.id+'" data-confirm="1">'+(armed===l.id?"삭제 확인":"삭제")+'</button></div>'}).join(""):'<p class="empty">기록이 없어요.</p>');
   var plan=(P&&P[k]||[]).filter(function(p){return !logs.some(function(l){return l.task===p.t.id})});
   if(plan.length)h+='<h3>예정</h3>'+plan.map(function(p){return '<div class="rowline"><span class="grow">'+esc(p.t.name)+'</span>'+(p.late?'<span class="pill late">밀림</span>':'')+'</div>'}).join("");
@@ -762,7 +763,7 @@ setInterval(function(){var k=keyOf(new Date());if(k!==TODAY){TODAY=k;render()}},
 (function boot(){
   var c=API&&readCache();
   if(!c){load();return}
-  norm(c.state);CLOSED=c.closed||{};VERSION=c.version||0;CLOSEDV=c.closedVersion||0;pending=c.pending||[];loaded=true;
+  norm(c.state);CLOSED=c.closed||{};VERSION=c.version||0;CLOSEDV=c.closedVersion||0;pending=c.pending||[];loaded=true;BASEJ=c.base||null;PATCH=c.patch===true;
   saveState=pending.length?"pending":"checking";render();
   if(pending.length)save();else load(true);
 })();
