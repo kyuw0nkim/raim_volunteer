@@ -546,6 +546,7 @@ function save(){
     }
     inflight=false;again=false;
     if(res&&res.code==="conflict"){setSave("conflict");return}
+    if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
     setSave("error");
   }).catch(function(){inflight=false;setSave("error")});
@@ -557,6 +558,7 @@ function load(bg){
   if(!API){showSetup();return}
   if(!bg&&loaded)setSave("loading");
   fetch(loadURL(bg&&loaded)).then(function(r){return r.json()}).then(function(res){
+    if(res&&res.code==="forbidden"){noAccess();return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(!res||!res.ok){
       if(loaded){setSave(bg?(saveState==="checking"?"offline":saveState):"error");return}
@@ -578,6 +580,8 @@ function load(bg){
     showSetup("웹앱에 연결하지 못했어요. 주소가 맞는지, 배포할 때 액세스 권한을 ‘모든 사용자’로 했는지 확인하세요.");
   });
 }
+/* 보드 전용 접속 코드로 다른 보드를 열었을 때 */
+function noAccess(){try{localStorage.removeItem(CACHEKEY)}catch(e){}showSetup("이 접속 코드로는 자원봉사 보드를 열 수 없어요. 이 보드용 코드나 연결 링크를 받았다면 넣어 주세요.")}
 function showSetup(msg){
   loaded=false;
   var a=API||{url:"",token:""};
