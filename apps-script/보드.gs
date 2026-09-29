@@ -102,7 +102,8 @@ function doPost(e) {
   const versionKey = atelier ? 'ATELIER_VERSION' : 'BOARD_VERSION';
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(20000);
+    // 다른 저장이 시트를 쓰는 중이면 기다렸다가, 너무 오래 걸리면 busy로 알려 줍니다 (보드가 조금 뒤 다시 시도)
+    if (!lock.tryLock(25000)) return 보드_json_({ ok: false, code: 'busy' });
     const current = Number(PropertiesService.getScriptProperties().getProperty(versionKey) || 0);
     if (Number(body.baseVersion) !== current) {
       return 보드_json_({ ok: false, code: 'conflict', version: current });
