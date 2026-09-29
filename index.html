@@ -122,6 +122,14 @@ function num(v){return v===""||v==null||isNaN(+v)?null:+v}
 var TODAY=keyOf(new Date());
 
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
+/* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
+(function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-act=copylink]");if(!b||!API)return;
+  var s=location.origin+location.pathname+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(API.token);
+  var manual=function(){window.prompt("이 링크를 복사해서 공유하세요. 열면 웹앱 주소·접속 코드가 자동으로 들어가요.",s)};
+  try{navigator.clipboard.writeText(s).then(function(){b.textContent="링크 복사됨 · 단톡방에 붙여넣기"},manual)}catch(x){manual()}
+});
 function get(board,extra){
   var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(board?"&board="+board:"")+(extra||"");
   return fetch(u).then(function(r){return r.json()}).catch(function(){return {ok:false,code:"net"}});
@@ -191,7 +199,7 @@ function atHTML(res){
 }
 
 function render(v,a){
-  var h='<header class="top"><h1>RAIM 업무 대시보드<small>'+md(TODAY)+' · 오늘 챙길 일</small></h1><button type="button" class="linkbtn" data-act="setup">연결 설정</button></header>';
+  var h='<header class="top"><h1>RAIM 업무 대시보드<small>'+md(TODAY)+' · 오늘 챙길 일</small></h1><span><button type="button" class="linkbtn" data-act="copylink">연결 링크 복사</button> <button type="button" class="linkbtn" data-act="setup">연결 설정</button></span></header>';
   if(v.code==="auth"||a.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
   if(!v.ok&&!a.ok)h+='<div class="banner">웹앱에 연결하지 못했어요. 연결 설정을 확인해 주세요.</div>';
   h+='<div class="boards">'+volHTML(v)+atHTML(a)+'</div>';
