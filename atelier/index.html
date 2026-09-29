@@ -9,7 +9,6 @@
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" media="print" onload="this.media='all'">
 <style>
 :root{color-scheme:light;
@@ -26,15 +25,16 @@
   --accent:var(--primary-deep);--accent-press:var(--primary-press);--accent-soft:var(--primary-subdued);--accent-ink:var(--on-primary);
   --danger:#C23A2E;--danger-soft:#FBE8E5;--warn:#9A5B00;--warn-soft:#FFF1D6;--ok:#1C7447;--ok-soft:#E1F2E8;
   --closed:#ADC4D7;
-  --sans:"Inter","Pretendard Variable",Pretendard,system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --sans:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --mono:var(--sans);
   --mesh:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 440' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3Cfilter id='b' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='70'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1440' height='440' fill='%23EEF7FF'/%3E%3Cg filter='url(%23b)'%3E%3Cellipse cx='150' cy='110' rx='360' ry='150' fill='%23C3E4FD'/%3E%3Cellipse cx='560' cy='60' rx='330' ry='130' fill='%2333D1E6' fill-opacity='.32'/%3E%3Cellipse cx='910' cy='140' rx='360' ry='140' fill='%234AADFD' fill-opacity='.42'/%3E%3Cellipse cx='1250' cy='70' rx='300' ry='140' fill='%239885F4' fill-opacity='.38'/%3E%3Cellipse cx='1440' cy='260' rx='220' ry='110' fill='%23EBAD5C' fill-opacity='.28'/%3E%3C/g%3E%3C/svg%3E");
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:300;line-height:1.4;font-feature-settings:"ss01";-webkit-font-smoothing:antialiased;position:relative}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:400;line-height:1.45;-webkit-font-smoothing:antialiased;position:relative}
 /* gradient mesh backdrop across the upper band */
 body::before{content:"";position:absolute;left:0;right:0;top:0;height:440px;z-index:-1;pointer-events:none;background:var(--mesh) center top/cover no-repeat;-webkit-mask-image:linear-gradient(#000 50%,transparent);mask-image:linear-gradient(#000 50%,transparent)}
-b,strong{font-weight:500}
+b,strong{font-weight:600}
+h3,h4{font-weight:600}
 #app{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:16px 48px;display:grid;gap:16px}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -45,7 +45,7 @@ button{cursor:pointer}
 .crumb{font-size:12.5px;color:var(--muted);text-decoration:none}
 .crumb:hover{color:var(--accent)}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between}
-.top h1{margin:0;font-size:20px;font-weight:500;letter-spacing:-.01em}
+.top h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
 .top-r{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
 .save{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
 .save i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
@@ -53,7 +53,7 @@ button{cursor:pointer}
 .save[data-s="error"] i{background:var(--danger)}
 .save button{border:0;background:none;color:var(--accent);padding:0;font-weight:400}
 .me{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:12px}
-.me b{font-weight:500}
+.me b{font-weight:600}
 
 .tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:none}
 .tabs button{border:0;background:none;padding:9px 14px;font-weight:400;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
@@ -69,7 +69,7 @@ button{cursor:pointer}
 .empty{color:var(--muted);font-size:13px}
 .banner{border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px}
 
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:6px 12px;font-size:13px;font-weight:400;white-space:nowrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:6px 12px;font-size:13px;font-weight:500;white-space:nowrap}
 .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--accent-ink)}
 .btn.ok{background:var(--ok);border-color:var(--ok);color:var(--on-dark)}
 .btn.ghost{border-color:transparent;background:none;color:var(--muted);padding:6px 8px}
@@ -91,7 +91,7 @@ button{cursor:pointer}
 .task[data-s="late"],.task[data-s="today"],.task[data-s="flag"]{--tc:var(--danger)}
 .task[data-s="soon"],.task[data-s="warn"]{--tc:var(--warn)}
 .task[data-s="done"]{--tc:var(--ok)}
-.task .t-name{font-weight:500;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.task .t-name{font-weight:600;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
 .task .t-sub{font-size:12.5px;color:var(--muted);grid-column:1}
 .task .t-act{grid-row:1/3;grid-column:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .task details{grid-column:1/-1;font-size:12.5px}
@@ -157,7 +157,7 @@ textarea{width:100%;resize:vertical;min-height:70px}
 .stock{display:grid;gap:6px}
 .item{display:grid;grid-template-columns:minmax(120px,1.4fr) auto minmax(70px,.5fr) minmax(90px,.8fr) auto auto;gap:8px;align-items:center;padding:8px 10px;border-radius:9px;background:var(--sunk)}
 .item.low{background:var(--danger-soft)}
-.item input.nm{font-weight:500}
+.item input.nm{font-weight:600}
 .step{display:inline-flex;align-items:center;border:1px solid var(--line-input);border-radius:8px;background:var(--surface);overflow:hidden}
 .step button{border:0;background:none;width:34px;height:34px;font-size:17px}
 .step input{width:64px;border:0;border-left:1px solid var(--line-input);border-right:1px solid var(--line-input);border-radius:0;text-align:center;font-variant-numeric:tabular-nums;font-size:14px;height:34px}
@@ -170,7 +170,7 @@ textarea{width:100%;resize:vertical;min-height:70px}
 .issue{display:grid;gap:4px;padding:10px 12px;border-radius:9px;background:var(--sunk);border-left:4px solid var(--warn)}
 .issue.done{border-left-color:var(--ok);opacity:.8}
 .issue .i-h{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
-.issue .eq{font-size:12px;font-weight:500;color:var(--warn)}
+.issue .eq{font-size:12px;font-weight:600;color:var(--warn)}
 .issue.done .eq{color:var(--ok)}
 .issue .txt{white-space:pre-wrap}
 .issue .s{font-size:12px;color:var(--muted)}
@@ -186,7 +186,7 @@ textarea{width:100%;resize:vertical;min-height:70px}
 @media (max-width:760px){.tset{grid-template-columns:1fr 1fr}.tset .f-g,.tset .f-n{grid-column:1/-1}}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:560px){.two{grid-template-columns:1fr}}
-.two label{display:grid;gap:4px;font-size:12px;font-weight:500;color:var(--muted)}
+.two label{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .two textarea{min-height:150px;font-weight:400;color:var(--ink);line-height:1.7}
 
 /* setup */
@@ -195,16 +195,16 @@ textarea{width:100%;resize:vertical;min-height:70px}
 .setup h1{margin:0;font-size:20px}
 .setup p{margin:0;color:var(--muted);font-size:13px}
 .setup-f{display:grid;gap:6px}
-.setup-f label{font-size:12px;font-weight:500;color:var(--muted);margin-top:6px}
+.setup-f label{font-size:12px;font-weight:600;color:var(--muted);margin-top:6px}
 .setup-f input{border:1px solid var(--line-input);border-radius:8px;padding:9px 10px;font-size:14px;width:100%}
 .setup-f button{margin-top:10px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* design system */
 button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.desc{font-weight:400}
-.top h1,.setup h1{font-size:26px;font-weight:300;line-height:1.12;letter-spacing:-.26px}
+.top h1,.setup h1{font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.5px}
 .top h1 small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--ink-2)}
 .crumb{color:var(--ink-2)}
-.btn{border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:400;line-height:1.15}
+.btn{border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:500;line-height:1.15}
 .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
 .btn.primary:hover{background:var(--primary-soft);border-color:var(--primary-soft)}
 .btn.primary:active{background:var(--primary-press);border-color:var(--primary-press);color:var(--on-dark)}
@@ -213,12 +213,13 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .setup{border-radius:12px;box-shadow:var(--shadow-2);padding:32px}
 .setup-f input{border-color:var(--line-input);border-radius:6px;padding:8px 12px;min-height:40px}
 .save,.me{box-shadow:var(--shadow-1)}
-.cal-h strong{font-size:18px;font-weight:300;letter-spacing:0}
+.cal-h strong{font-size:18px;font-weight:700;letter-spacing:0}
 .cal-h button{border-radius:999px;border-color:var(--line-input)}
 .banner{border-radius:8px}
 .card{border-radius:12px;box-shadow:var(--shadow-1);padding:24px}
-.card h2{font-size:18px;font-weight:300;letter-spacing:0}
-.tabs button{font-weight:400}
+.card h2{font-size:18px;font-weight:700;letter-spacing:-.2px}
+.tabs button{font-weight:500}
+.tabs button.on{font-weight:700}
 .tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
 .task,.issue,.item{border-radius:12px}
 .cl label,.mini li,.rowline{border-radius:8px}
