@@ -30,7 +30,7 @@
   --mesh:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 440' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3Cfilter id='b' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='70'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1440' height='440' fill='%23EEF7FF'/%3E%3Cg filter='url(%23b)'%3E%3Cellipse cx='150' cy='110' rx='360' ry='150' fill='%23C3E4FD'/%3E%3Cellipse cx='560' cy='60' rx='330' ry='130' fill='%2333D1E6' fill-opacity='.32'/%3E%3Cellipse cx='910' cy='140' rx='360' ry='140' fill='%234AADFD' fill-opacity='.42'/%3E%3Cellipse cx='1250' cy='70' rx='300' ry='140' fill='%239885F4' fill-opacity='.38'/%3E%3Cellipse cx='1440' cy='260' rx='220' ry='110' fill='%23EBAD5C' fill-opacity='.28'/%3E%3C/g%3E%3C/svg%3E");
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:400;line-height:1.45;-webkit-font-smoothing:antialiased;position:relative}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:450;line-height:1.45;-webkit-font-smoothing:antialiased;position:relative}
 /* gradient mesh backdrop across the upper band */
 body::before{content:"";position:absolute;left:0;right:0;top:0;height:440px;z-index:-1;pointer-events:none;background:var(--mesh) center top/cover no-repeat;-webkit-mask-image:linear-gradient(#000 50%,transparent);mask-image:linear-gradient(#000 50%,transparent)}
 b,strong{font-weight:600}
@@ -41,7 +41,7 @@ button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px;justify-content:space-between}
 .top h1{margin:0;font-size:22px;letter-spacing:-.01em}
-.top h1 small{display:block;font-size:13px;font-weight:400;color:var(--muted)}
+.top h1 small{display:block;font-size:13px;font-weight:450;color:var(--muted)}
 .linkbtn{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:0}
 .boards{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 @media (max-width:820px){.boards{grid-template-columns:1fr}}
@@ -59,7 +59,7 @@ button{cursor:pointer}
 .todo{margin:0;padding:0;list-style:none;display:grid;gap:4px}
 .todo li{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:6px 10px;border-radius:7px;background:var(--sunk)}
 .todo li span:last-child{color:var(--muted);font-size:12px;white-space:nowrap}
-.todo li.hot span:last-child{color:var(--danger);font-weight:400}
+.todo li.hot span:last-child{color:var(--danger);font-weight:450}
 .note{color:var(--muted);font-size:13px}
 .banner{border:1px solid var(--warn);background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px}
 .boot{color:var(--muted);padding:40px 0;text-align:center}
@@ -71,9 +71,9 @@ button{cursor:pointer}
 .setup-f input{border:1px solid var(--line-input);border-radius:8px;padding:9px 10px;font-size:14px;width:100%}
 .btn{border:1px solid var(--primary);background:var(--primary);color:var(--accent-ink);border-radius:8px;padding:9px 16px;font-weight:500;margin-top:10px}
 /* design system */
-button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.desc{font-weight:400}
+button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.desc{font-weight:450}
 .top h1,.setup h1{font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.5px}
-.top h1 small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--ink-2)}
+.top h1 small{font-size:13px;font-weight:450;letter-spacing:0;color:var(--ink-2)}
 .crumb{color:var(--ink-2)}
 .btn{border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:500;line-height:1.15}
 .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
@@ -99,6 +99,10 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .todo li{border-radius:8px}
 .btn{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
 .btn:active{background:var(--primary-press);border-color:var(--primary-press);color:var(--on-dark)}
+.todo li{padding:0}
+.todo li a{display:flex;justify-content:space-between;gap:8px;width:100%;padding:6px 10px;color:inherit;text-decoration:none;border-radius:8px}
+.todo li a:hover,.stat:hover{box-shadow:inset 0 0 0 1px var(--line-input)}
+@media (max-width:640px){.setup-f input{font-size:16px}}
 </style>
 </head>
 <body>
@@ -178,9 +182,10 @@ function atHTML(res){
   h+='<a class="stat'+(s.closedToday?"":s.ck<s.ckOf?"":" good")+'" href="atelier/#today"><b>'+(s.closedToday?"휴관":s.ck+"/"+s.ckOf)+'</b><span>오늘 점검</span></a>';
   h+='<a class="stat'+(s.low.length?" hot":" good")+'" href="atelier/#stock"><b>'+s.low.length+'</b><span>재고 부족</span></a>';
   h+='<a class="stat'+(s.issues.length?" hot":" good")+'" href="atelier/#issues"><b>'+s.issues.length+'</b><span>장비 이슈</span></a></div>';
-  var rows=s.todo.map(function(t){return '<li class="'+(t.hot?"hot":"")+'"><span>'+esc(t.name)+'</span><span>'+esc(t.txt)+'</span></li>'})
-    .concat(s.low.map(function(i){return '<li class="hot"><span>재고: '+esc(i.name)+'</span><span>'+esc(i.qty)+esc(i.unit)+' 남음</span></li>'}))
-    .concat(s.issues.slice(0,3).map(function(i){return '<li><span>'+(i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text)+'</span><span>'+diff(i.date,TODAY)+'일째</span></li>'}));
+  var rows=s.todo.map(function(t){return '<li class="'+(t.hot?"hot":"")+'"><a href="atelier/#today"><span>'+esc(t.name)+'</span><span>'+esc(t.txt)+'</span></a></li>'})
+    .concat(s.low.map(function(i){return '<li class="hot"><a href="atelier/#stock"><span>재고: '+esc(i.name)+'</span><span>'+esc(i.qty)+esc(i.unit)+' 남음</span></a></li>'}))
+    .concat(s.issues.slice(0,3).map(function(i){return '<li><a href="atelier/#issues"><span>'+(i.equip?'['+esc(i.equip)+'] ':'')+esc(i.text)+'</span><span>'+diff(i.date,TODAY)+'일째</span></a></li>'}));
+  if(s.issues.length>3)rows.push('<li><a href="atelier/#issues"><span>장비 이슈 '+(s.issues.length-3)+'건 더</span><span>전체 보기 →</span></a></li>');
   if(rows.length)h+='<ul class="todo">'+rows.join("")+'</ul>';
   return h+'</section>';
 }

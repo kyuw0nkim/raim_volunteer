@@ -31,7 +31,7 @@
   --mesh:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 440' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3Cfilter id='b' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='70'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1440' height='440' fill='%23EEF7FF'/%3E%3Cg filter='url(%23b)'%3E%3Cellipse cx='150' cy='110' rx='360' ry='150' fill='%23C3E4FD'/%3E%3Cellipse cx='560' cy='60' rx='330' ry='130' fill='%2333D1E6' fill-opacity='.32'/%3E%3Cellipse cx='910' cy='140' rx='360' ry='140' fill='%234AADFD' fill-opacity='.42'/%3E%3Cellipse cx='1250' cy='70' rx='300' ry='140' fill='%239885F4' fill-opacity='.38'/%3E%3Cellipse cx='1440' cy='260' rx='220' ry='110' fill='%23EBAD5C' fill-opacity='.28'/%3E%3C/g%3E%3C/svg%3E");
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:400;line-height:1.45;-webkit-font-smoothing:antialiased;position:relative}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:450;line-height:1.45;-webkit-font-smoothing:antialiased;position:relative}
 /* gradient mesh backdrop across the upper band */
 body::before{content:"";position:absolute;left:0;right:0;top:0;height:440px;z-index:-1;pointer-events:none;background:var(--mesh) center top/cover no-repeat;-webkit-mask-image:linear-gradient(#000 50%,transparent);mask-image:linear-gradient(#000 50%,transparent)}
 b,strong{font-weight:600}
@@ -46,12 +46,12 @@ button{cursor:pointer}
 .crumb:hover{color:var(--accent)}
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;justify-content:space-between}
 .top h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
-.top h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
+.top h1 small{display:block;font-size:12px;font-weight:450;color:var(--muted);letter-spacing:0}
 .save{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
 .save i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
 .save[data-s="pending"] i,.save[data-s="saving"] i{background:var(--warn)}
 .save[data-s="error"] i,.save[data-s="ro"] i{background:var(--danger)}
-.save button{border:0;background:none;color:var(--accent);padding:0;font-weight:400}
+.save button{border:0;background:none;color:var(--accent);padding:0;font-weight:450}
 
 /* to-do board */
 .todo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -64,7 +64,7 @@ button{cursor:pointer}
 .lane .empty{color:var(--muted);font-size:13px;padding:6px 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);background:var(--sunk);border-radius:6px;padding:3px 8px;font-size:12.5px;display:inline-flex;gap:6px;align-items:center}
-.chip.we{border-color:var(--danger);background:var(--danger-soft);color:var(--danger);font-weight:400}
+.chip.we{border-color:var(--danger);background:var(--danger-soft);color:var(--danger);font-weight:450}
 .chip .tag{font-size:10.5px;letter-spacing:.04em}
 .entry-list{display:grid;gap:10px;max-height:340px;overflow:auto;padding-right:2px}
 .eg{display:grid;gap:4px}
@@ -106,12 +106,12 @@ button{cursor:pointer}
 .dh{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
 .dh h2{margin:0;font-size:22px;letter-spacing:-.01em}
 .dh .code{color:var(--muted);font-size:12px}
-.pill{font-size:12px;font-weight:400;border-radius:999px;padding:2px 10px}
+.pill{font-size:12px;font-weight:450;border-radius:999px;padding:2px 10px}
 .pill.check{background:var(--danger-soft);color:var(--danger)}.pill.attend{background:var(--warn-soft);color:var(--warn)}
 .pill.entry{background:var(--accent-soft);color:var(--accent-press)}.pill.done{background:var(--ok-soft);color:var(--ok)}
 .pill.closed{background:var(--sunk);color:var(--muted)}.pill.ready{background:var(--sunk);color:var(--muted)}
 .toggles{display:flex;flex-wrap:wrap;gap:8px}
-.tg{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:7px 12px;background:var(--surface);font-weight:400}
+.tg{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:7px 12px;background:var(--surface);font-weight:450}
 .tg.on{border-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
 .tg.warn{border-color:var(--danger);background:var(--danger-soft);color:var(--danger)}
 .tg input{accent-color:var(--ok);width:16px;height:16px;margin:0}
@@ -119,7 +119,7 @@ button{cursor:pointer}
 .tg.rogon input{accent-color:var(--accent)}
 .subs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
 .subs label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:7px;padding:4px 10px;background:var(--surface);color:var(--ink)}
-.subs label.on{border-color:var(--ok);background:var(--ok-soft);color:var(--ok);font-weight:400}
+.subs label.on{border-color:var(--ok);background:var(--ok-soft);color:var(--ok);font-weight:450}
 .subs input{margin:0;accent-color:var(--ok);width:15px;height:15px}
 
 .slot{display:grid;gap:6px}
@@ -145,11 +145,11 @@ button{cursor:pointer}
 .pin{border:1px solid var(--line);background:var(--surface);border-radius:6px;font-size:11.5px;padding:4px 7px;white-space:nowrap;color:var(--muted)}
 .pin.on{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
 .rogtg{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface)}
-.rogtg.on{border-color:var(--accent);color:var(--accent-press);background:var(--accent-soft);font-weight:400}
+.rogtg.on{border-color:var(--accent);color:var(--accent-press);background:var(--accent-soft);font-weight:450}
 .rogtg input{margin:0;accent-color:var(--accent)}
 .rogtg.dim{opacity:.5}
 .dayrule{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)}
-.dayrule b{color:var(--ink);font-weight:400}
+.dayrule b{color:var(--ink);font-weight:450}
 
 /* quick entry */
 .qe{border:1.5px solid var(--accent);border-radius:10px;padding:14px;display:grid;gap:12px;background:var(--accent-soft)}
@@ -160,7 +160,7 @@ button{cursor:pointer}
 @media (max-width:620px){.qe-grid{grid-template-columns:1fr}}
 .qe-box{display:grid;gap:4px}
 .qe-box label{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600}
-.qe-box label span{font-weight:400;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.qe-box label span{font-weight:450;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
 .qe-box.rog label{color:var(--accent)}
 .qe textarea{min-height:92px;font-size:14px;line-height:1.6;background:var(--surface)}
 .qe-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -202,19 +202,19 @@ textarea:disabled{background:var(--sunk);color:var(--muted)}
 .prio li span{flex:1}
 .prio li button{border:1px solid var(--line);background:var(--surface);border-radius:5px;width:24px;height:22px;font-size:11px;padding:0}
 .prio li button:disabled{opacity:.3;cursor:default}
-.prio .lbl{font-size:12px;font-weight:400;margin-bottom:2px}
+.prio .lbl{font-size:12px;font-weight:450;margin-bottom:2px}
 .caps{display:grid;gap:4px}
 .caps label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:var(--sunk);border-radius:6px;padding:4px 8px}
 .caps input{width:64px;border:1px solid var(--line-input);background:var(--surface);border-radius:5px;padding:3px 6px;font-size:13px;text-align:right}
 .wdays{display:flex;flex-wrap:wrap;gap:4px}
 .wdays label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12.5px;background:var(--surface)}
-.wdays label.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-press);font-weight:400}
+.wdays label.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-press);font-weight:450}
 .wdays input{margin:0;accent-color:var(--accent)}
 #lime-list{min-height:120px}
 .lime{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}
 .lime input{margin:0;accent-color:var(--accent)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:none;padding:4px 10px;font-size:12.5px;font-weight:400;color:var(--muted)}
+.seg button{border:0;background:none;padding:4px 10px;font-size:12.5px;font-weight:450;color:var(--muted)}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button.on.o{background:var(--ok);color:var(--surface)}
 .seg button.on.x{background:var(--danger);color:var(--surface)}
@@ -239,9 +239,9 @@ pre.notice{margin:0;white-space:pre-wrap;word-break:keep-all;background:var(--su
 .closedmsg{color:var(--muted);font-size:14px;padding:8px 0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* design system */
-button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.desc{font-weight:400}
+button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.desc{font-weight:450}
 .top h1,.setup h1{font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.5px}
-.top h1 small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--ink-2)}
+.top h1 small{font-size:13px;font-weight:450;letter-spacing:0;color:var(--ink-2)}
 .crumb{color:var(--ink-2)}
 .btn{border:1px solid var(--accent);background:var(--surface);color:var(--accent);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:500;line-height:1.15}
 .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
@@ -265,6 +265,18 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 .row,.eg label,.caps label,.prio li{border-radius:8px}
 .cell{border-radius:8px}
 .cell.sel{background:var(--primary)}
+/* usability */
+.seg button{white-space:nowrap}
+@media (min-width:981px){.row{grid-template-columns:minmax(100px,1fr) minmax(170px,1.4fr) auto auto auto minmax(80px,1fr) auto}}
+.cal-h .ttl{display:flex;align-items:center;gap:8px}
+.cal-h button.today-btn{width:auto;height:26px;padding:0 10px;font-size:12px;color:var(--accent)}
+.qe-act .muted.dirty{color:var(--warn);font-weight:600}
+@media (max-width:640px){
+  input[type=text],input[type=number],input[type=url],input[type=month],select,textarea{font-size:16px!important}
+  .seg button{padding:8px 14px}
+  .ent,.rogtg,.pin,.del{padding:8px 10px}
+  .tg,.subs label{padding:8px 12px}
+}
 </style>
 </head>
 <body>
@@ -274,6 +286,7 @@ button,label,select,small,.pill,.badge,.chip,.legend,.wd,.empty,.none,.hint,.des
 "use strict";
 var PLACES={"1F":"1층 전시 안내 및 안전관리","2F":"2층 교육장 운영지원","3F":"3층 상주 운영지원","4F":"4층 로공방 운영지원","-":"배치 미정"};
 var PORDER=["1F","2F","3F","4F","-"];
+var PSHORT={"1F":"1층 전시안내","2F":"2층 교육장","3F":"3층 상주","4F":"4층 로공방","-":"배치 미정"};
 var WD=["일","월","화","수","목","금","토"];
 var SLOTS=["오전","오후"];
 
@@ -385,15 +398,19 @@ function applyBoxes(k){
   return {added:added,removed:removed};
 }
 var lastApply=null;
+/* text pasted into the boxes but not applied yet, per day, so re-renders don't wipe it */
+var QD={};
+function qeDirty(k){return !!(QD[k]&&Object.keys(QD[k]).length)}
+function qeMsg(k){return qeDirty(k)?"반영 안 된 변경이 있어요 · ‘명단 반영’을 눌러 주세요":lastApply&&lastApply.k===k?("반영했어요 · 추가 "+lastApply.added+"명, 삭제 "+lastApply.removed+"명"):"1365 확인은 위 체크박스로 해요 · Ctrl+Enter"}
 function qeHTML(k){
   var d=peek(k);
   var h='<div class="qe"><div class="qe-h"><h3>1365 명단 입력</h3><p>1365에서 복사해 붙여넣기만 하세요. 줄바꿈·쉼표·표 복사 모두 되고, 전화번호가 같이 있으면 함께 저장돼요. 배치는 자동이에요.</p></div><div class="qe-grid">';
   boxes(k).forEach(function(b){
-    var names=boxVols(k,b).map(function(v){return v.name});
-    h+='<div class="qe-box'+(b.rog?" rog":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+names.length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(names.join("\n"))+'</textarea></div>';
+    var names=boxVols(k,b).map(function(v){return v.name}),dr=QD[k]&&QD[k][b.id],txt=dr!=null?dr:names.join("\n");
+    h+='<div class="qe-box'+(b.rog?" rog":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+parseNames(txt).length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(txt)+'</textarea></div>';
   });
   h+='</div><div class="qe-act"><button type="button" class="btn primary big" data-act="qeapply">'+(d.vols.length?"명단 다시 반영":"명단 반영")+'</button>';
-  h+='<span class="muted">'+(lastApply&&lastApply.k===k?("반영했어요 · 추가 "+lastApply.added+"명, 삭제 "+lastApply.removed+"명"):"1365 확인은 위 체크박스로 해요 · Ctrl+Enter")+'</span></div></div>';
+  h+='<span class="muted'+(qeDirty(k)?" dirty":"")+'" id="qe-msg">'+qeMsg(k)+'</span></div></div>';
   return h;
 }
 function reassignFrom(k0){Object.keys(S.days).forEach(function(k){if(k>=k0)autoAssign(k)})}
@@ -424,48 +441,114 @@ var STLABEL={closed:"휴관",check:"명단 확인 필요",attend:"출석 표시 
 
 /* ---------- UI state (per viewer) ---------- */
 var UI={sel:TODAY,vy:+TODAY.slice(0,4),vm:+TODAY.slice(4,6)-1};
-try{var u=JSON.parse(sessionStorage.getItem("raim-ui")||localStorage.getItem("raim-ui")||"null");if(u&&u.sel){UI=u}}catch(e){}
+try{var u=JSON.parse(sessionStorage.getItem("raim-ui")||"null");if(u&&u.sel){UI=u}
+  else{u=JSON.parse(localStorage.getItem("raim-ui")||"null");if(u&&u.rym)UI.rym=u.rym}}catch(e){}
 function keepUI(){try{var s=JSON.stringify(UI);localStorage.setItem("raim-ui",s);sessionStorage.setItem("raim-ui",s)}catch(e){}}
 var restoreY=null;try{restoreY=+sessionStorage.getItem("raim-scroll");sessionStorage.removeItem("raim-scroll")}catch(e){}
 
 /* ---------- sync with the Google Sheet (Apps Script web app) ---------- */
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
-var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false;
+var VERSION=0,saveState="idle",saveTimer=null,inflight=false,again=false,loaded=false,DIRTY=false,retries=0;
+/* BASE = what the sheet had when we last loaded or saved. If someone else saves first, the sheet rejects
+   our save; we then fetch their version and merge: whatever we changed since BASE wins, everything else
+   is taken from theirs (per day field, per 1365 check, per volunteer field). */
+var BASE=null;
+function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
+function same(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function pick(b,m,t){return same(m,b)?t:m}
+function keysOf(){var o={};for(var i=0;i<arguments.length;i++)Object.keys(arguments[i]||{}).forEach(function(k){o[k]=1});return Object.keys(o)}
+function mergeState(B,M,T){
+  B=B||{};M=M||{};T=T||{};
+  var bs=B.settings||{},ms=M.settings||{},ts=T.settings||{},out={days:{},settings:{}},both=[];
+  keysOf(bs,ms,ts).forEach(function(k){
+    if(k==="cap"){var c={},bc=bs.cap||{},mc=ms.cap||{},tc=ts.cap||{};keysOf(bc,mc,tc).forEach(function(p){var v=pick(bc[p],mc[p],tc[p]);if(v!==undefined)c[p]=v});out.settings.cap=c;return}
+    var v=pick(bs[k],ms[k],ts[k]);if(v!==undefined)out.settings[k]=clone(v);
+  });
+  var bd=B.days||{},md=M.days||{},td=T.days||{};
+  keysOf(bd,md,td).forEach(function(k){
+    var b=bd[k],m=md[k],t=td[k];
+    if(same(m,b)){if(t)out.days[k]=clone(t)}
+    else if(same(t,b)){if(m)out.days[k]=clone(m)}
+    else{out.days[k]=mergeDay(b,m,t);both.push(k)}
+  });
+  return {state:out,both:both};
+}
+function mergeDay(b,m,t){
+  b=b||{};m=m||{};t=t||{};
+  var d={};
+  ["checked","closed","rog","note"].forEach(function(f){var v=pick(b[f],m[f],t[f]);if(v!==undefined)d[f]=v});
+  var bc=b.chk||{},mc=m.chk||{},tc=t.chk||{};d.chk={};
+  keysOf(bc,mc,tc).forEach(function(c){if(pick(bc[c],mc[c],tc[c]))d.chk[c]=true});
+  function idx(L){var o={};(L||[]).forEach(function(v){o[v.id]=v});return o}
+  var bv=idx(b.vols),mv=idx(m.vols),tv=idx(t.vols),vols=[];
+  (t.vols||[]).forEach(function(x){
+    var bx=bv[x.id],mx=mv[x.id];
+    if(bx&&!mx)return;                         // we deleted it
+    if(!bx||!mx){vols.push(clone(x));return}   // they added it
+    var o={};keysOf(bx,mx,x).forEach(function(f){var v=pick(bx[f],mx[f],x[f]);if(v!==undefined)o[f]=clone(v)});vols.push(o);
+  });
+  (m.vols||[]).forEach(function(x){
+    if(tv[x.id]||bv[x.id])return;              // already merged, or they deleted it
+    // both pasted the same 1365 list: keep one
+    if(vols.some(function(y){return !bv[y.id]&&y.name===x.name&&y.slot===x.slot}))return;
+    vols.push(clone(x));
+  });
+  d.vols=vols;
+  return d;
+}
+/* take their newer copy and put our unsaved changes on top of it */
+function rebase(res){
+  var r=mergeState(BASE,S,res.state);
+  initState(r.state);BASE=clone(res.state);VERSION=res.version||0;
+  if(res.lime){LIME=res.lime;LIMESRC=LIME.length?"sheet":"board"}
+  r.both.forEach(function(k){var d=S.days[k];if(!d)return;if(d.chk&&Object.keys(d.chk).length)syncChecked(k);if(k>=TODAY)autoAssign(k)});
+  writeCache();
+  if(!typing())render();
+}
+function loadURL(withV){return API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(withV?"&v="+VERSION:"")}
 /* the last copy is kept in this browser so the board opens instantly; the sheet is checked right after */
 var CACHEKEY="raim-cache";
 function readCache(){try{var c=JSON.parse(localStorage.getItem(CACHEKEY)||"null");if(c&&API&&c.url===API.url&&c.state)return c}catch(e){}return null}
-function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,lime:LIME,dirty:DIRTY}))}catch(e){}}
+function writeCache(){if(!API||!loaded)return;try{localStorage.setItem(CACHEKEY,JSON.stringify({url:API.url,version:VERSION,state:S,base:BASE,lime:LIME,dirty:DIRTY}))}catch(e){}}
 function setSave(s){saveState=s;var el=document.getElementById("save");if(el)el.outerHTML=saveHTML()}
 function saveHTML(){
-  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"다른 기기에서 먼저 저장됐어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
-  var btn=(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':(saveState==="conflict"||saveState==="newer")?' <button type="button" data-act="reload">최신 내용 불러오기</button>':saveState==="offline"?' <button type="button" data-act="reload">다시 시도</button>':"";
-  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",newer:"pending"}[saveState]||saveState;
+  var t={idle:"시트에 저장됨",pending:"저장 대기",saving:"저장 중…",merging:"다른 기기 변경과 합치는 중…",error:"저장 실패 · 연결을 확인하세요",conflict:"합치지 못했어요",loading:"불러오는 중…",checking:"최신 내용 확인 중…",newer:"다른 기기에서 바뀐 내용이 있어요",offline:"연결 안 됨 · 마지막 저장본 표시 중"}[saveState]||"";
+  var btn=saveState==="conflict"?' <button type="button" data-act="savenow">지금 저장</button> · <button type="button" data-act="reload">최신 내용 불러오기</button>':(saveState==="pending"||saveState==="error")?' <button type="button" data-act="savenow">지금 저장</button>':saveState==="newer"?' <button type="button" data-act="reload">최신 내용 불러오기</button>':saveState==="offline"?' <button type="button" data-act="reload">다시 시도</button>':"";
+  var s={conflict:"error",offline:"error",loading:"saving",checking:"saving",merging:"saving",newer:"pending"}[saveState]||saveState;
   return '<span class="save" id="save" data-s="'+s+'" role="status"><i></i>'+t+btn+'</span>';
 }
-function touch(){if(saveState==="conflict")return;DIRTY=true;writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
+function touch(){if(saveState==="conflict")retries=0;DIRTY=true;writeCache();setSave("pending");clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
 function save(){
   clearTimeout(saveTimer);saveTimer=null;
   if(!API||!loaded||saveState==="conflict")return;
   if(inflight){again=true;return}
   inflight=true;setSave("saving");
-  fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API.token,action:"save",baseVersion:VERSION,state:S})})
+  var sent=JSON.stringify(S);
+  fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:'{"token":'+JSON.stringify(API.token)+',"action":"save","baseVersion":'+VERSION+',"state":'+sent+'}'})
   .then(function(r){return r.json()}).then(function(res){
-    inflight=false;
-    if(res&&res.ok){VERSION=res.version;if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
-    again=false;
+    if(res&&res.ok){inflight=false;retries=0;VERSION=res.version;BASE=JSON.parse(sent);if(again){again=false;save()}else if(!saveTimer){DIRTY=false;setSave("idle")}writeCache();return}
+    if(res&&res.code==="conflict"&&retries<4){
+      // someone else saved first: take their version, put our changes on top, try again
+      retries++;setSave("merging");
+      return fetch(loadURL(false)).then(function(r){return r.json()}).then(function(r2){
+        inflight=false;again=false;
+        if(!r2||!r2.ok||!r2.state){setSave("error");return}
+        rebase(r2);save();
+      });
+    }
+    inflight=false;again=false;
     if(res&&res.code==="conflict"){setSave("conflict");return}
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요. 다시 입력해 주세요.");return}
     setSave("error");
-  },function(){inflight=false;setSave("error")});
+  }).catch(function(){inflight=false;setSave("error")});
 }
 function typing(){var a=document.activeElement;return !!(a&&a.closest&&a.closest("#app")&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))}
-function applyServer(res){initState(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=false;writeCache()}
+function applyServer(res){initState(res.state);BASE=clone(res.state);VERSION=res.version||0;LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=false;writeCache()}
 /* bg=true: quiet check in the background (the page is already showing the saved copy) */
 function load(bg){
   if(!API){showSetup();return}
   if(!bg&&loaded)setSave("loading");
-  var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(bg&&loaded?"&v="+VERSION:"");
-  fetch(u).then(function(r){return r.json()}).then(function(res){
+  fetch(loadURL(bg&&loaded)).then(function(r){return r.json()}).then(function(res){
     if(res&&res.code==="auth"){showSetup("접속 코드가 맞지 않아요.");return}
     if(!res||!res.ok){
       if(loaded){setSave(bg?(saveState==="checking"?"offline":saveState):"error");return}
@@ -474,7 +557,8 @@ function load(bg){
     if(bg&&loaded){
       var sameVer=res.same||res.version===VERSION;
       var limeChanged=JSON.stringify(res.lime||[])!==JSON.stringify(LIME);
-      if(DIRTY||saveTimer||inflight){if(!sameVer)setSave("conflict");else if(saveState==="checking")setSave("idle");return}
+      // unsaved changes here: the next save merges with the newer sheet by itself
+      if(DIRTY||saveTimer||inflight){if(!saveTimer&&!inflight){retries=0;if(saveState==="conflict")saveState="pending";save()}else if(saveState==="checking")setSave("pending");return}
       if(sameVer&&!limeChanged){if(saveState==="checking")setSave("idle");return}
       if(typing()){setSave("newer");return}
       if(sameVer){LIME=res.lime||[];LIMESRC=LIME.length?"sheet":"board";writeCache();saveState="idle";render();return}
@@ -495,7 +579,7 @@ document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="hidden"&&saveTimer)save();
   if(document.visibilityState==="visible"&&loaded&&!saveTimer&&!inflight&&saveState!=="conflict"){if(saveState==="idle")setSave("checking");load(true)}
 });
-window.addEventListener("beforeunload",function(e){if(saveTimer||inflight){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",function(e){if(saveTimer||inflight||Object.keys(QD).length){e.preventDefault();e.returnValue=""}});
 
 /* ---------- notice text ---------- */
 function notice(k){
@@ -541,13 +625,42 @@ function todo(){
 
 /* ---------- render ---------- */
 var armed=null;
+var CONFLICTMSG='<div class="banner">다른 기기에서 계속 동시에 저장하고 있어서 합치지 못했어요. ‘지금 저장’으로 다시 시도하거나, ‘최신 내용 불러오기’로 시트 내용을 다시 열 수 있어요 (그러면 이 기기에서 방금 바꾼 내용은 빠져요).</div>';
+/* re-rendering while a mouse/finger is down swallows the click (the element under it is replaced),
+   e.g. typing a memo and then pressing 출석. So wait until the click has gone through. */
+var ptrDown=false,deferred=false,kbd=false,ptrSeq=0,soonT=null;
+function flush(){ptrDown=false;if(deferred)render()}
+document.addEventListener("pointerdown",function(){ptrDown=true;kbd=false;ptrSeq++},true);
+document.addEventListener("pointerup",function(){var n=ptrSeq;setTimeout(function(){if(n===ptrSeq)flush()},300)},true);
+document.addEventListener("pointercancel",function(){setTimeout(flush,0)},true);
+document.addEventListener("click",function(){ptrDown=false},true);
+document.addEventListener("keydown",function(){kbd=true;ptrDown=false},true);
+/* after a change event (fires before Tab moves focus), render once focus has landed */
+function soon(){clearTimeout(soonT);soonT=setTimeout(render,0)}
+function focusKey(){
+  var a=document.activeElement,app=document.getElementById("app");if(!a||!app.contains(a))return null;
+  var field=/^(TEXTAREA|SELECT)$/.test(a.tagName)||(a.tagName==="INPUT"&&!/^(checkbox|radio)$/.test(a.type));
+  if(!field&&!kbd)return null;
+  if(a.id)return '[id="'+a.id+'"]';
+  var ds=a.dataset||{},sel="";["act","id","k","v","s","d","c","w","p","l","i"].forEach(function(n){if(ds[n]!=null)sel+='[data-'+n+'="'+String(ds[n]).replace(/"/g,"")+'"]'});
+  return sel?a.tagName.toLowerCase()+sel:null;
+}
 function render(){
+  if(ptrDown){deferred=true;return}
+  deferred=false;clearTimeout(soonT);
+  var y=window.scrollY,fk=focusKey(),el=document.querySelector(".entry-list"),es=el?el.scrollTop:0;
+  paint();
+  el=document.querySelector(".entry-list");if(el)el.scrollTop=es;
+  window.scrollTo(0,y);
+  if(fk){var f=document.querySelector(fk);if(f)try{f.focus({preventScroll:true})}catch(x){}}
+}
+function paint(){
   var T=todo();
   var h='';
   if(UI.view==="settings"){
     h+='<a class="crumb" href="../">← RAIM 업무 대시보드</a>';
     h+='<header class="top"><h1>설정<small>배치 규칙 · 라메 명단 · 활동기록부</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="board">← 보드로</button></div></header>';
-    if(saveState==="conflict")h+='<div class="banner">다른 기기나 창에서 먼저 저장했어요. ‘최신 내용 불러오기’를 누른 뒤 다시 입력해 주세요. 방금 바꾼 내용은 저장되지 않았어요.</div>';
+    if(saveState==="conflict")h+=CONFLICTMSG;
     h+=rulesHTML();
     h+=reportHTML();
     h+='<div class="setfoot"><span>웹앱 주소·접속 코드를 바꾸려면</span><button type="button" class="btn" data-act="setup">연결 설정</button></div>';
@@ -555,7 +668,7 @@ function render(){
   }
   h+='<a class="crumb" href="../">← RAIM 업무 대시보드</a>';
   h+='<header class="top"><h1>RAIM 자원봉사 보드<small>1365 명단 확인 · 출석 · 실적 입력을 한곳에서</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="settings" title="배치 규칙 · 라메 명단">설정</button></div></header>';
-  if(saveState==="conflict")h+='<div class="banner">다른 기기나 창에서 먼저 저장했어요. ‘최신 내용 불러오기’를 누른 뒤 다시 입력해 주세요. 방금 바꾼 내용은 저장되지 않았어요.</div>';
+  if(saveState==="conflict")h+=CONFLICTMSG;
 
   // lanes
   h+='<section class="todo" aria-label="할 일">';
@@ -653,7 +766,7 @@ function prioList(key,label){
 
 function calHTML(){
   var y=UI.vy,m=UI.vm,first=new Date(y,m,1),last=new Date(y,m+1,0).getDate();
-  var h='<div class="cal"><div class="cal-h"><button type="button" data-act="mon" data-d="-1" aria-label="이전 달">‹</button><strong>'+y+'년 '+(m+1)+'월</strong><button type="button" data-act="mon" data-d="1" aria-label="다음 달">›</button></div><div class="grid">';
+  var h='<div class="cal"><div class="cal-h"><button type="button" data-act="mon" data-d="-1" aria-label="이전 달">‹</button><span class="ttl"><strong>'+y+'년 '+(m+1)+'월</strong>'+(UI.sel!==TODAY||y+pad(m+1)!==TODAY.slice(0,6)?'<button type="button" class="today-btn" data-act="go" data-k="'+TODAY+'">오늘</button>':'')+'</span><button type="button" data-act="mon" data-d="1" aria-label="다음 달">›</button></div><div class="grid">';
   WD.forEach(function(w,i){h+='<div class="wd'+(i===0?" sun":i===6?" sat":"")+'">'+w+'</div>'});
   for(var i=0;i<first.getDay();i++)h+='<div class="cell pad"></div>';
   for(var dd=1;dd<=last;dd++){
@@ -677,9 +790,9 @@ function detailHTML(){
   }
   h+='<label class="tg"><input type="checkbox" data-act="closed"'+(closed?" checked":"")+'> 휴관일</label></div>';
   if(closed){return h+'<div class="closedmsg">휴관일이에요. 운영하는 날이면 체크를 풀어 주세요.</div></div>'}
-  var dc=d.chk||{};
+  var dc=d.chk||{},nLocked=d.vols.filter(function(v){return v.locked}).length;
   h+='<div class="subs" role="group" aria-label="1365 모집 공고별 확인">'+chkItems(k).map(function(c){var on=!!dc[c.id];return '<label class="'+(on?"on":"")+'"><input type="checkbox" data-act="subchk" data-c="'+c.id+'"'+(on?" checked":"")+'> '+c.label+'</label>'}).join("")+'</div>';
-  h+='<div class="dayrule"><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(d.vols.length?'<button type="button" class="btn" data-act="reauto">고정 풀고 전체 자동 배치</button>':'')+'</div>';
+  h+='<div class="dayrule"><span>배치 순서 <b>'+(rog?ST.prioRog:ST.prioNo.filter(function(p){return p!=="4F"})).map(short).join(" > ")+'</b></span>'+(nLocked?'<button type="button" class="btn" data-act="reauto">고정 '+nLocked+'명 풀고 자동 배치</button>':'')+'</div>';
   h+=qeHTML(k);
 
   SLOTS.forEach(function(s){
@@ -691,8 +804,8 @@ function detailHTML(){
     vs.forEach(function(v){
       h+='<div class="row'+(v.attend==="x"?" absent":"")+'">';
       h+='<div class="f-name"><input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">'+(isLime(v.name)?'<span class="badge b-lime">라메</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge b-day">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+'</div>';
-      h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+'>'+PLACES[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button></div>';
-      h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방 모집</label>';
+      h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+' title="'+PLACES[p]+'">'+PSHORT[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button></div>';
+      h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방</label>';
       h+='<span class="seg f-att" role="group" aria-label="출석"><button type="button" class="o'+(v.attend==="o"?" on":"")+'" data-act="att" data-v="o" data-id="'+v.id+'" aria-pressed="'+(v.attend==="o")+'">출석</button><button type="button" class="x'+(v.attend==="x"?" on":"")+'" data-act="att" data-v="x" data-id="'+v.id+'" aria-pressed="'+(v.attend==="x")+'">결석</button></span>';
       var can=v.attend==="o";
       h+='<label class="ent f-ent '+(can?(v.entered?"on":""):"off")+'"><input type="checkbox" data-act="ent" data-id="'+v.id+'"'+(v.entered?" checked":"")+(can?"":" disabled")+'> 1365 입력</label>';
@@ -703,25 +816,25 @@ function detailHTML(){
     h+='</div></div>';
   });
 
-  h+='<div class="two"><div class="field"><label for="note">공지 추가 문구 <span style="font-weight:400">(한 줄에 하나, 앞에 * 자동)</span></label><textarea id="note" data-act="note" placeholder="예: 오후 단체 관람 있음 (종일봉사자 점심시간 문구는 자동으로 들어가요)">'+esc(d.note||"")+'</textarea></div>';
+  h+='<div class="two"><div class="field"><label for="note">공지 추가 문구 <span style="font-weight:450">(한 줄에 하나, 앞에 * 자동)</span></label><textarea id="note" data-act="note" placeholder="예: 오후 단체 관람 있음 (종일봉사자 점심시간 문구는 자동으로 들어가요)">'+esc(d.note||"")+'</textarea></div>';
   h+='<div class="field"><div class="nh"><span class="lb">공지문</span><button type="button" class="btn primary" data-act="copy" id="copybtn">복사</button></div><pre class="notice" id="notice">'+esc(notice(k))+'</pre></div></div>';
   return h+'</div>';
 }
 
 function findVol(id){var d=peek(UI.sel);for(var i=0;i<d.vols.length;i++)if(d.vols[i].id===id)return d.vols[i];return null}
 function findAny(k,id){var d=S.days[k];if(!d)return null;for(var i=0;i<d.vols.length;i++)if(d.vols[i].id===id)return d.vols[i];return null}
-function go(k){UI.sel=k;UI.vy=+k.slice(0,4);UI.vm=+k.slice(4,6)-1;keepUI();armed=null;render();var el=document.querySelector(".detail");if(el&&window.innerWidth<861)el.scrollIntoView({block:"start"})}
+function go(k){UI.sel=k;UI.vy=+k.slice(0,4);UI.vm=+k.slice(4,6)-1;keepUI();armed=null;render();var el=document.querySelector(".detail");if(el&&window.innerWidth<861&&el.getBoundingClientRect().top>window.innerHeight*.5)el.scrollIntoView({block:"start",behavior:"smooth"})}
 
 var app=document.getElementById("app");
 app.addEventListener("click",function(e){
   var t=e.target.closest("[data-act]");if(!t)return;var a=t.dataset.act;
   if(a!=="del"&&armed){armed=null}
-  if(a==="sel"){UI.sel=t.dataset.k;keepUI();render();return}
+  if(a==="sel"){go(t.dataset.k);return}
   if(a==="go"){go(t.dataset.k);return}
   if(a==="view"){UI.view=t.dataset.v;keepUI();render();window.scrollTo(0,0);return}
   if(a==="report"){var ri=document.getElementById("rym");if(ri&&ri.value)downloadReport(ri.value);return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
-  if(a==="savenow"){save();return}
+  if(a==="savenow"){retries=0;if(saveState==="conflict")saveState="pending";save();return}
   if(a==="reload"){if(saveState==="offline"&&DIRTY){saveState="pending";save();return}saveState="idle";load(false);return}
   if(a==="setup"){if(saveTimer)save();showSetup();return}
   if(a==="qeapply"){doApply();return}
@@ -739,27 +852,34 @@ app.addEventListener("click",function(e){
 function selectNotice(){var p=document.getElementById("notice");if(!p)return;var r=document.createRange();r.selectNodeContents(p);var s=window.getSelection();s.removeAllRanges();s.addRange(r);var b=document.getElementById("copybtn");if(b)b.textContent="선택됨 · Ctrl+C"}
 app.addEventListener("change",function(e){
   var t=e.target,a=t.dataset&&t.dataset.act;if(!a)return;
+  if(t.tagName==="SELECT"||t.type==="checkbox")ptrDown=false;
   if(a==="rym"){UI.rym=t.value;keepUI();return}
-  if(a==="checked"){var dk=ensure(UI.sel);if(!dk.chk)dk.chk={};chkItems(UI.sel).forEach(function(c){dk.chk[c.id]=t.checked});syncChecked(UI.sel);touch();render();return}
-  if(a==="subchk"){var ds=ensure(UI.sel);if(!ds.chk)ds.chk={};ds.chk[t.dataset.c]=t.checked;syncChecked(UI.sel);touch();render();return}
-  if(a==="closed"){ensure(UI.sel).closed=t.checked;touch();render();return}
+  if(a==="checked"){var dk=ensure(UI.sel);if(!dk.chk)dk.chk={};chkItems(UI.sel).forEach(function(c){dk.chk[c.id]=t.checked});syncChecked(UI.sel);touch();soon();return}
+  if(a==="subchk"){var ds=ensure(UI.sel);if(!ds.chk)ds.chk={};ds.chk[t.dataset.c]=t.checked;syncChecked(UI.sel);touch();soon();return}
+  if(a==="closed"){ensure(UI.sel).closed=t.checked;touch();soon();return}
   if(a==="entered"){var v=findAny(t.dataset.k,t.dataset.id);if(v){v.entered=t.checked;touch();setTimeout(render,500)}return}
   var v2=findVol(t.dataset.id);
-  if(a==="ent"&&v2){v2.entered=t.checked;touch();render();return}
-  if(a==="rog"&&v2){v2.rog=t.checked;autoAssign(UI.sel);touch();render();return}
-  if(a==="place"&&v2){v2.place=t.value;v2.locked=true;autoAssign(UI.sel);touch();render();return}
-  if(a==="dayrog"){ensure(UI.sel).rog=t.checked;autoAssign(UI.sel);touch();render();return}
-  if(a==="limelist"){var seen={};ST.lime=t.value.split(/[\n,]+/).map(function(x){return x.trim()}).filter(function(x){if(!x||seen[x])return false;seen[x]=1;return true});touch();render();return}
-  if(a==="cap"){var cv=t.value.trim();ST.cap[t.dataset.p]=cv===""?null:Math.max(0,parseInt(cv,10)||0);reassignFrom(TODAY);touch();render();return}
-  if(a==="rogday"){var w=+t.dataset.w;ST.rogDays=ST.rogDays.filter(function(x){return x!==w});if(t.checked)ST.rogDays.push(w);reassignFrom(TODAY);touch();render();return}
-  if(a==="name"&&v2){var n=t.value.trim();if(n){v2.name=n;touch()}render();return}
-  if(a==="memo"&&v2){v2.memo=t.value.trim();touch();render();return}
+  if(a==="ent"&&v2){v2.entered=t.checked;touch();soon();return}
+  if(a==="rog"&&v2){v2.rog=t.checked;autoAssign(UI.sel);touch();soon();return}
+  if(a==="place"&&v2){v2.place=t.value;v2.locked=true;autoAssign(UI.sel);touch();soon();return}
+  if(a==="dayrog"){ensure(UI.sel).rog=t.checked;autoAssign(UI.sel);touch();soon();return}
+  if(a==="limelist"){var seen={};ST.lime=t.value.split(/[\n,]+/).map(function(x){return x.trim()}).filter(function(x){if(!x||seen[x])return false;seen[x]=1;return true});touch();soon();return}
+  if(a==="cap"){var cv=t.value.trim();ST.cap[t.dataset.p]=cv===""?null:Math.max(0,parseInt(cv,10)||0);reassignFrom(TODAY);touch();soon();return}
+  if(a==="rogday"){var w=+t.dataset.w;ST.rogDays=ST.rogDays.filter(function(x){return x!==w});if(t.checked)ST.rogDays.push(w);reassignFrom(TODAY);touch();soon();return}
+  if(a==="name"&&v2){var n=t.value.trim();if(n){v2.name=n;touch()}soon();return}
+  if(a==="memo"&&v2){v2.memo=t.value.trim();touch();soon();return}
 });
-function doApply(){var r=applyBoxes(UI.sel);lastApply={k:UI.sel,added:r.added,removed:r.removed};touch();render()}
+function doApply(){var r=applyBoxes(UI.sel);delete QD[UI.sel];lastApply={k:UI.sel,added:r.added,removed:r.removed};touch();render()}
 app.addEventListener("keydown",function(e){if(e.target.dataset&&e.target.dataset.qe&&(e.ctrlKey||e.metaKey)&&e.key==="Enter"){e.preventDefault();doApply()}});
 app.addEventListener("input",function(e){
   var t=e.target;
-  if(t.dataset&&t.dataset.qe){var c=document.getElementById(t.id+"-n");if(c)c.textContent=parseNames(t.value).length+"명";return}if(t.id!=="note")return;
+  if(t.dataset&&t.dataset.qe){
+    var c=document.getElementById(t.id+"-n");if(c)c.textContent=parseNames(t.value).length+"명";
+    var b0=boxes(UI.sel).filter(function(b){return b.id===t.id})[0],q=QD[UI.sel]=QD[UI.sel]||{};
+    if(b0&&t.value===boxVols(UI.sel,b0).map(function(v){return v.name}).join("\n"))delete q[t.id];else q[t.id]=t.value;
+    if(!Object.keys(q).length)delete QD[UI.sel];
+    var mg=document.getElementById("qe-msg");if(mg){mg.textContent=qeMsg(UI.sel);mg.className="muted"+(qeDirty(UI.sel)?" dirty":"")}
+    return}if(t.id!=="note")return;
   ensure(UI.sel).note=t.value;var p=document.getElementById("notice");if(p)p.textContent=notice(UI.sel);touch();
 });
 app.addEventListener("submit",function(e){
@@ -785,6 +905,8 @@ app.addEventListener("submit",function(e){
   var c=API&&readCache();
   if(!c){load(false);return}
   initState(c.state);VERSION=c.version||0;LIME=c.lime||[];LIMESRC=LIME.length?"sheet":"board";loaded=true;DIRTY=!!c.dirty;
+  // older caches have no base: then unsaved changes here win everywhere when merging
+  BASE=c.base||(DIRTY?{days:{},settings:{}}:clone(c.state));
   saveState=DIRTY?"pending":"checking";render();
   if(DIRTY)save();else load(true);
 })();
