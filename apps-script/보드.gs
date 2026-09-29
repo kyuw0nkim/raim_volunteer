@@ -43,6 +43,7 @@ function doGet(e) {
     const p = (e && e.parameter) || {};
     const perm = 보드_권한_(p.token);
     if (!perm) return 보드_json_({ ok: false, code: 'auth' });
+    if (p.action === 'codes') return 보드_json_(보드_공유코드_(p.token));
     if (!perm[p.board === 'atelier' ? 'atelier' : 'volunteer']) return 보드_json_({ ok: false, code: 'forbidden' });
     // 보드가 가진 판(v)과 같으면 내용 없이 same 만 돌려줍니다. 가장 흔하고 가장 빠른 경우예요.
     if (p.action === 'load' && p.board === 'atelier') {
@@ -363,6 +364,33 @@ function 보드_설치() {
   Logger.log('설치 완료. 보드 접속 코드: ' + token);
 }
 
+/**
+ * 보드의 '연결 링크 복사'가 부릅니다. 전체 코드로 물으면 보드별 전용 코드를 알려 주고(없으면 만듦),
+ * 전용 코드로 물으면 그 코드가 열 수 있는 보드만 알려 줍니다.
+ */
+function 보드_공유코드_(token) {
+  const props = PropertiesService.getScriptProperties();
+  const scope = Object.keys(보드_권한_(token) || {});
+  if (String(token || '') !== props.getProperty('BOARD_TOKEN')) return { ok: true, full: false, scope };
+  const out = { ok: true, full: true, scope };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    [['volunteer', 'VOLUNTEER_TOKEN'], ['atelier', 'ATELIER_TOKEN']].forEach(([board, key]) => {
+      let t = props.getProperty(key);
+      if (!t) { t = 보드_새코드_(); props.setProperty(key, t); }
+      out[board] = t;
+    });
+  } finally {
+    lock.releaseLock();
+  }
+  return out;
+}
+
+function 보드_새코드_() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+}
+
 /** 전체 접속 코드(두 보드 모두)를 새로 만듭니다 (코드가 새어 나갔을 때). 보드에서 새 코드로 다시 연결하세요. */
 function 보드_접속코드바꾸기() {
   보드_코드만들기_('BOARD_TOKEN', '전체(두 보드)', '');
@@ -387,7 +415,7 @@ function 보드_보드별코드_모두없애기() {
 }
 
 function 보드_코드만들기_(key, label, path) {
-  const token = Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+  const token = 보드_새코드_();
   PropertiesService.getScriptProperties().setProperty(key, token);
   Logger.log(label + ' 접속 코드: ' + token);
   // 보드주소가 있으면 바로 공유할 수 있는 연결 링크도 만들어 줍니다

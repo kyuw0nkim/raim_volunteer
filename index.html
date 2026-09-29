@@ -124,11 +124,23 @@ var TODAY=keyOf(new Date());
 var API=null;try{API=JSON.parse(localStorage.getItem("raim-api")||"null")}catch(e){}
 /* 연결 링크(…#c=웹앱주소&t=접속코드)로 열면 이 브라우저에 저장하고 주소창에서 지워요 — 세 보드가 같이 씀 */
 (function(){try{var p=new URLSearchParams(location.hash.slice(1));if(!p.get("c")||!p.get("t"))return;API={url:p.get("c").trim(),token:p.get("t").trim()};history.replaceState(null,"",location.pathname+location.search);localStorage.setItem("raim-api",JSON.stringify(API))}catch(e){}})();
+/* 연결 링크 복사: data-board 보드의 전용 코드를 웹앱에서 받아 링크를 만들어요.
+   전체 코드가 있는 기기에서만 전용 코드를 받을 수 있고, 아니면 이 기기 코드(이미 전용) 그대로 */
 document.addEventListener("click",function(e){
-  var b=e.target.closest("[data-act=copylink]");if(!b||!API)return;
-  var s=location.origin+location.pathname+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(API.token);
-  var manual=function(){window.prompt("이 링크를 복사해서 공유하세요. 열면 웹앱 주소·접속 코드가 자동으로 들어가요.",s)};
-  try{navigator.clipboard.writeText(s).then(function(){b.textContent="링크 복사됨 · 단톡방에 붙여넣기"},manual)}catch(x){manual()}
+  var b=e.target.closest("[data-act=copylink]");if(!b||!API||b.disabled)return;
+  var want=b.dataset.board||"",label0=b.textContent;
+  b.disabled=true;b.textContent="링크 만드는 중…";
+  fetch(API.url+(API.url.indexOf("?")<0?"?":"&")+"action=codes&token="+encodeURIComponent(API.token)).then(function(r){return r.json()}).catch(function(){return null}).then(function(res){
+    b.disabled=false;b.textContent=label0;
+    var tok=API.token,what="?";
+    if(res&&res.ok){if(res.full&&want&&res[want]){tok=res[want];what=want}else what=res.full?"all":(res.scope||[]).join(",")}
+    var name={all:"전체 권한(두 보드 모두)",volunteer:"자원봉사 보드 전용",atelier:"아뜰리에 보드 전용"}[what]||"이 기기와 같은 권한";
+    var root=location.pathname.replace(/\/(volunteer|atelier)\/(index\.html)?$/,"/").replace(/index\.html$/,"");
+    var s=location.origin+root+({volunteer:"volunteer/",atelier:"atelier/"}[what]||"")+"#c="+encodeURIComponent(API.url)+"&t="+encodeURIComponent(tok);
+    var manual=function(){window.prompt(name+" 연결 링크예요. 복사해서 공유하세요."+(what==="?"?" (Apps Script가 예전 버전이라 전용 링크를 못 만들었어요. 이 기기 코드가 그대로 들어가요.)":""),s)};
+    if(what==="?"){manual();return}
+    try{navigator.clipboard.writeText(s).then(function(){b.textContent="복사됨 · "+name},manual)}catch(x){manual()}
+  });
 });
 function get(board,extra){
   var u=API.url+(API.url.indexOf("?")<0?"?":"&")+"action=load&token="+encodeURIComponent(API.token)+(board?"&board="+board:"")+(extra||"");
