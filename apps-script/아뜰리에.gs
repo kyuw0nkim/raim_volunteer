@@ -12,6 +12,7 @@ const 아뜰리에_탭 = {
   tasks: { tab: '아뜰리에_업무', cols: [
     ['id', 'id'], ['업무', 'name'], ['종류', 'type'], ['주기(일)', 'every'], ['알림(일)', 'warn'],
     ['방법', 'guide'], ['연결', 'link'], ['필요표시일', 'flagDate'], ['필요표시자', 'flagBy'], ['필요메모', 'flagMemo'],
+    ['제안미룸', 'snooze'],
   ] },
   logs: { tab: '아뜰리에_업무기록', cols: [
     ['id', 'id'], ['날짜', 'date'], ['업무id', 'task'], ['업무', 'taskName'], ['한 사람', 'by'], ['메모', 'memo'],
@@ -114,7 +115,7 @@ function 아뜰리에_지난일수_(from, to) {
   return Math.round((t(to) - t(from)) / 86400000);
 }
 
-/** 매일 아침(운영일): 오늘까지 해야 하는 주기 업무, 필요 표시된 업무, 재고 부족, 미해결 장비 이슈 */
+/** 매일 아침(운영일): 오늘까지 해야 하는 주기 업무, 필요 표시된 업무, 제안 업무, 재고 부족, 미해결 장비 이슈 */
 function 아뜰리에_알림_아침() {
   const today = 보드_오늘_();
   const closed = 아뜰리에_휴관지정_();
@@ -124,9 +125,19 @@ function 아뜰리에_알림_아침() {
 
   const due = [];
   const flagged = [];
+  const suggested = [];
   s.tasks.forEach(t => {
     if (t.flagDate) flagged.push('- ' + t.name + ' (' + (t.flagBy || '') + (t.flagMemo ? ': ' + t.flagMemo : '') + ')');
-    if (t.type !== '주기') return;
+    if (t.type !== '주기') {
+      // 필요시 업무: '제안(일)'만큼 안 했으면 제안. '나중에'로 미뤘으면 그날까지 빼기
+      const warn = Number(t.warn);
+      if (t.flagDate || !t.warn || !warn || (t.snooze && t.snooze > today)) return;
+      const last = s.logs.filter(l => l.task === t.id).map(l => l.date).sort().pop() || '';
+      if (last === today) return;
+      const since = last ? 아뜰리에_지난일수_(last, today) : null;
+      if (since == null || since >= warn) suggested.push('- ' + t.name + (since == null ? ' (기록 없음)' : ' (마지막 ' + since + '일 전)'));
+      return;
+    }
     const n = 아뜰리에_다음예정_(t, s.logs, closed, today);
     if (n.due <= today) {
       const late = 아뜰리에_지난일수_(n.due, today);
@@ -135,6 +146,7 @@ function 아뜰리에_알림_아침() {
   });
   if (due.length) { lines.push('■ 오늘 할 루틴 업무'); lines.push.apply(lines, due); lines.push(''); }
   if (flagged.length) { lines.push('■ 필요하다고 표시된 업무'); lines.push.apply(lines, flagged); lines.push(''); }
+  if (suggested.length) { lines.push('■ 제안 업무 (필요해 보이면 보드에서 ‘필요해요’)'); lines.push.apply(lines, suggested); lines.push(''); }
 
   const low = s.items.filter(i => i.min !== '' && Number(i.qty) <= Number(i.min));
   if (low.length) {

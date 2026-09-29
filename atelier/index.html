@@ -24,7 +24,7 @@
   --bg:var(--canvas);--surface:var(--canvas);--sunk:var(--canvas-soft);
   --accent:var(--primary-deep);--accent-press:var(--primary-press);--accent-soft:var(--primary-subdued);--accent-ink:var(--on-primary);
   --danger:#C23A2E;--danger-soft:#FBE8E5;--warn:#9A5B00;--warn-soft:#FFF1D6;--ok:#1C7447;--ok-soft:#E1F2E8;
-  --closed:#ADC4D7;
+  --closed:#ADC4D7;--suggest:#5B46C9;--suggest-soft:#ECE8FD;
   --sans:"Pretendard Variable",Pretendard,system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --mono:var(--sans);
   --mesh:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 440' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3Cfilter id='b' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='70'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1440' height='440' fill='%23EEF7FF'/%3E%3Cg filter='url(%23b)'%3E%3Cellipse cx='150' cy='110' rx='360' ry='150' fill='%23C3E4FD'/%3E%3Cellipse cx='560' cy='60' rx='330' ry='130' fill='%2333D1E6' fill-opacity='.32'/%3E%3Cellipse cx='910' cy='140' rx='360' ry='140' fill='%234AADFD' fill-opacity='.42'/%3E%3Cellipse cx='1250' cy='70' rx='300' ry='140' fill='%239885F4' fill-opacity='.38'/%3E%3Cellipse cx='1440' cy='260' rx='220' ry='110' fill='%23EBAD5C' fill-opacity='.28'/%3E%3C/g%3E%3C/svg%3E");
@@ -84,6 +84,7 @@ button{cursor:pointer}
 .pill.soon,.pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.ok{background:var(--sunk);color:var(--muted)}
 .pill.done{background:var(--ok-soft);color:var(--ok)}
+.pill.suggest{background:var(--suggest-soft);color:var(--suggest)}
 
 /* routine tasks */
 .tasks{display:grid;gap:8px}
@@ -91,12 +92,16 @@ button{cursor:pointer}
 .task[data-s="late"],.task[data-s="today"],.task[data-s="flag"]{--tc:var(--danger)}
 .task[data-s="soon"],.task[data-s="warn"]{--tc:var(--warn)}
 .task[data-s="done"]{--tc:var(--ok)}
+.task[data-s="suggest"]{--tc:var(--suggest)}
 .task .t-name{font-weight:600;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
 .task .t-sub{font-size:12.5px;color:var(--muted);grid-column:1}
 .task .t-act{grid-row:1/3;grid-column:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .task details{grid-column:1/-1;font-size:12.5px}
 .task details summary{cursor:pointer;color:var(--accent)}
 .task details p{margin:4px 0 0;white-space:pre-wrap;color:var(--ink)}
+.later>summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.later[open]>summary{margin-bottom:8px}
+.card .lead{margin:0;font-size:12.5px;color:var(--muted)}
 @media (max-width:560px){.task{grid-template-columns:1fr}.task .t-act{grid-row:auto;grid-column:1;justify-content:flex-start}}
 
 /* checklists */
@@ -254,7 +259,7 @@ var DEF={
     {id:"helpbot",name:"헬프로봇 번호 정리",type:"필요시",every:"",warn:"",guide:"",link:""},
     {id:"mlsort",name:"머신러닝 카드 재분류",type:"필요시",every:"",warn:"",guide:"",link:""},
     {id:"mlmake",name:"머신러닝 카드 만들기",type:"필요시",every:"",warn:"",guide:"",link:""},
-    {id:"stock",name:"재고 조사",type:"주기",every:"30",warn:"",guide:"재고 탭에서 수량을 확인하고 ‘재고 조사 완료’를 누르면 기록돼요.",link:"stock"}
+    {id:"stock",name:"재고 조사",type:"필요시",every:"",warn:"30",guide:"재고 탭에서 수량을 확인하고 ‘재고 조사 완료’를 누르면 기록돼요.",link:"stock"}
   ],
   items:[
     {id:"worksheet",name:"되살리다 활동지",unit:"장",qty:"",min:"",place:""},
@@ -318,7 +323,7 @@ function apply(op){
       if(byId(S.stockLogs,op.id+"-0"))break;
       S.items.forEach(function(it,i){it.date=op.date;it.by=op.by;S.stockLogs.push({id:op.id+"-"+i,date:op.date,item:it.id,itemName:it.name,qty:it.qty,by:op.by,memo:"재고 조사"})});
       var st=S.tasks.filter(function(t){return t.link==="stock"})[0];
-      if(st)upsert(S.logs,{id:op.id,date:op.date,task:st.id,taskName:st.name,by:op.by,memo:""});
+      if(st){upsert(S.logs,{id:op.id,date:op.date,task:st.id,taskName:st.name,by:op.by,memo:""});st.flagDate=st.flagBy=st.flagMemo=st.snooze=""}
       break;
   }
 }
@@ -431,7 +436,7 @@ document.addEventListener("visibilitychange",function(){
 window.addEventListener("beforeunload",function(e){if(pending.length||inflight){e.preventDefault();e.returnValue=""}});
 
 /* ---------- derived ---------- */
-var ORDER={late:0,today:1,flag:2,soon:3,warn:4,done:5,ok:6};
+var ORDER={late:0,today:1,flag:2,soon:3,suggest:4,done:5,ok:6};
 function taskInfo(t){
   var logs=S.logs.filter(function(l){return l.task===t.id}).sort(function(a,b){return a.date<b.date?-1:1});
   var last=logs.length?logs[logs.length-1]:null,todayLog=logs.filter(function(l){return l.date===TODAY}).pop()||null;
@@ -450,9 +455,11 @@ function taskInfo(t){
     var since=last?diff(last.date,TODAY):null,warn=num(t.warn);
     if(todayLog)o.s="done";
     else if(t.flagDate)o.s="flag";
-    else if(warn!=null&&(since==null||since>=warn))o.s="warn";
+    else if(warn!=null&&(since==null||since>=warn)){if(t.snooze&&t.snooze>TODAY)o.snoozed=true;else o.s="suggest"}
     o.txt=since==null?"아직 기록 없음":since===0?"오늘 함":"마지막 "+since+"일 전 · "+md(last.date);
-    o.pill={done:"오늘 완료",flag:"필요해요",warn:"점검 권장",ok:"필요할 때"}[o.s];
+    if(warn!=null&&o.s!=="done")o.txt+=" · 보통 "+warn+"일쯤";
+    if(o.snoozed)o.txt+=" · "+md(t.snooze)+"부터 다시 제안";
+    o.pill={done:"오늘 완료",flag:"필요해요",suggest:"제안",ok:"여유 있을 때"}[o.s];
   }
   return o;
 }
@@ -516,9 +523,14 @@ function taskHTML(o){
   if(o.todayLog){
     h+='<button type="button" class="btn ghost" data-act="memo" data-id="'+o.todayLog.id+'">메모</button><button type="button" class="btn ghost" data-act="unlog" data-id="'+o.todayLog.id+'">완료 취소</button>';
   }else{
-    if(t.type!=="주기")h+='<button type="button" class="btn'+(t.flagDate?" flagon":"")+'" data-act="flag" data-id="'+t.id+'">'+(t.flagDate?"필요 표시 해제":"필요해요")+'</button>';
-    if(t.link==="stock")h+='<button type="button" class="btn ok" data-act="tab" data-v="stock">재고 조사하기</button>';
-    else h+='<button type="button" class="btn ok" data-act="done" data-id="'+t.id+'">완료</button>';
+    /* 필요시 업무는 ‘필요해요’가 주 버튼: 눌러야 할 일로 올라가고, 그 전에는 제안으로만 보여요 */
+    var need=t.type!=="주기"&&!t.flagDate,cls=need?"btn":"btn ok";
+    if(need){
+      h+='<button type="button" class="btn primary" data-act="flag" data-id="'+t.id+'">필요해요</button>';
+      if(o.s==="suggest")h+='<button type="button" class="btn ghost" data-act="snooze" data-id="'+t.id+'">나중에</button>';
+    }else if(t.type!=="주기")h+='<button type="button" class="btn ghost" data-act="flag" data-id="'+t.id+'">필요 표시 해제</button>';
+    if(t.link==="stock")h+='<button type="button" class="'+cls+'" data-act="tab" data-v="stock">재고 조사하기</button>';
+    else h+='<button type="button" class="'+cls+'" data-act="done" data-id="'+t.id+'">'+(need?"이미 했어요":"완료")+'</button>';
   }
   h+='</div>';
   if(t.guide)h+='<details><summary>방법 보기</summary><p>'+esc(t.guide)+'</p></details>';
@@ -538,7 +550,19 @@ function checklistHTML(date){
 
 function todayHTML(I){
   var h='<div class="cols"><div class="stack">';
-  h+='<section class="card"><h2>루틴 업무 <small>'+md(TODAY)+(isClosed(TODAY)?' · 휴관일':'')+'</small></h2><div class="tasks">'+(I.length?I.map(taskHTML).join(""):'<p class="empty">설정에서 루틴 업무를 추가해 주세요.</p>')+'</div></section>';
+  var cyc=function(o){return o.t.type==="주기"};
+  var todo=I.filter(function(o){return cyc(o)?o.s!=="ok":(o.s==="flag"||o.s==="done")});
+  var later=I.filter(function(o){return cyc(o)&&o.s==="ok"});
+  var sug=I.filter(function(o){return !cyc(o)&&(o.s==="suggest"||o.s==="ok")});
+  h+='<section class="card"><h2>할 일 <small>'+md(TODAY)+(isClosed(TODAY)?' · 휴관일':'')+'</small></h2><div class="tasks">';
+  h+=todo.length?todo.map(taskHTML).join(""):'<p class="empty">'+(I.length?'지금 할 일이 없어요.':'설정에서 업무를 추가해 주세요.')+'</p>';
+  h+='</div>'+(later.length?'<details class="later"><summary>다가오는 루틴 '+later.length+'개</summary><div class="tasks">'+later.map(taskHTML).join("")+'</div></details>':'')+'</section>';
+  if(I.some(function(o){return !cyc(o)})){
+    var ns=sug.filter(function(o){return o.s==="suggest"}).length;
+    h+='<section class="card"><h2>제안 업무 <small>'+(ns?'지금 해 보면 좋은 일 '+ns+'개':'정해진 날 없이 필요할 때')+'</small></h2>';
+    h+='<p class="lead">필요해 보이면 ‘필요해요’를 눌러 할 일로 올려 주세요. 한동안 안 한 업무는 ‘제안’으로 먼저 떠요.</p>';
+    h+='<div class="tasks">'+(sug.length?sug.map(taskHTML).join(""):'<p class="empty">모두 할 일로 올라가 있어요.</p>')+'</div></section>';
+  }
   h+='</div><div class="stack">';
   h+='<section class="card"><h2>오늘 점검</h2>'+(isClosed(TODAY)?'<p class="empty">오늘은 휴관일이에요.</p>':'')+checklistHTML(TODAY)+'</section>';
   var low=lowItems();
@@ -602,7 +626,7 @@ function dayHTML(k,P){
 function stockHTML(){
   var low=lowItems(),lastSurvey=S.stockLogs.slice().sort(function(a,b){return a.date<b.date?1:-1})[0];
   var h='<section class="card"><h2>재고 현황 <small>'+(lastSurvey?"마지막 조사 "+md(lastSurvey.date)+" · "+esc(lastSurvey.by||""):"아직 조사 기록이 없어요")+'</small></h2>';
-  h+='<p class="muted" style="margin:0;font-size:12.5px">수량을 맞춘 뒤 ‘재고 조사 완료’를 누르면 오늘 날짜로 기록되고, 루틴 업무 ‘재고 조사’도 완료돼요. 부족 기준 이하가 되면 빨간색으로 표시돼요.</p>';
+  h+='<p class="muted" style="margin:0;font-size:12.5px">수량을 맞춘 뒤 ‘재고 조사 완료’를 누르면 오늘 날짜로 기록되고, 업무 ‘재고 조사’도 완료돼요. 부족 기준 이하가 되면 빨간색으로 표시돼요.</p>';
   h+='<div class="addrow"><button type="button" class="btn ok big" data-act="survey">재고 조사 완료</button><button type="button" class="btn" data-act="copylow" id="copylow"'+(low.length?"":" disabled")+'>부족 목록 복사'+(low.length?' ('+low.length+')':'')+'</button></div>';
   h+='<div class="stock">';
   if(!S.items.length)h+='<p class="empty">품목이 없어요. 아래에서 추가해 주세요.</p>';
@@ -641,12 +665,12 @@ function issueHTML(x){
 }
 
 function settingsHTML(){
-  var h='<section class="card"><h2>루틴 업무 <small>주기: 마지막으로 한 날부터 N일 뒤 (휴관일이면 다음 운영일) · 필요시: 알림(일)을 넣으면 그만큼 지나면 ‘점검 권장’</small></h2><div class="stack" style="gap:6px">';
+  var h='<section class="card"><h2>업무 <small>주기: 마지막으로 한 날부터 N일 뒤 꼭 할 일 (휴관일이면 다음 운영일) · 필요시: 제안 업무로 두고 ‘필요해요’를 누르면 할 일로 올라감. 제안(일)을 넣으면 그만큼 안 했을 때 ‘제안’으로 떠요</small></h2><div class="stack" style="gap:6px">';
   S.tasks.forEach(function(t){
     var cyc=t.type==="주기";
     h+='<div class="tset"><label class="f-n">업무<input type="text" id="tn-'+t.id+'" data-act="taskf" data-f="name" data-id="'+t.id+'" value="'+esc(t.name)+'"></label>';
-    h+='<label>종류<select id="tt-'+t.id+'" data-act="taskf" data-f="type" data-id="'+t.id+'"><option'+(cyc?" selected":"")+'>주기</option><option'+(cyc?"":" selected")+'>필요시</option></select></label>';
-    h+=cyc?'<label>주기(일)<input type="number" min="1" id="te-'+t.id+'" data-act="taskf" data-f="every" data-id="'+t.id+'" value="'+esc(t.every)+'" placeholder="7"></label>':'<label>알림(일)<input type="number" min="1" id="tw-'+t.id+'" data-act="taskf" data-f="warn" data-id="'+t.id+'" value="'+esc(t.warn)+'" placeholder="없음"></label>';
+    h+='<label>종류<select id="tt-'+t.id+'" data-act="taskf" data-f="type" data-id="'+t.id+'"><option value="주기"'+(cyc?" selected":"")+'>주기</option><option value="필요시"'+(cyc?"":" selected")+'>필요시 (제안)</option></select></label>';
+    h+=cyc?'<label>주기(일)<input type="number" min="1" id="te-'+t.id+'" data-act="taskf" data-f="every" data-id="'+t.id+'" value="'+esc(t.every)+'" placeholder="7"></label>':'<label>제안(일)<input type="number" min="1" id="tw-'+t.id+'" data-act="taskf" data-f="warn" data-id="'+t.id+'" value="'+esc(t.warn)+'" placeholder="없음"></label>';
     h+='<label class="f-g">방법 메모<textarea id="tg-'+t.id+'" data-act="taskf" data-f="guide" data-id="'+t.id+'" placeholder="순서, 주의할 점 (선택)">'+esc(t.guide)+'</textarea></label>';
     h+='<button type="button" class="btn ghost'+(armed===t.id?" arm":"")+'" data-act="untask" data-id="'+t.id+'" style="align-self:end">'+(armed===t.id?"삭제 확인":"삭제")+'</button></div>';
   });
@@ -669,12 +693,13 @@ app.addEventListener("click",function(e){
   if(a==="sel"){var sk=t.dataset.k;UI.sel=sk;UI.vy=+sk.slice(0,4);UI.vm=+sk.slice(4,6)-1;keepUI();render();
     var dy=document.querySelector(".card.day");if(dy&&window.innerWidth<901&&dy.getBoundingClientRect().top>window.innerHeight*.5)dy.scrollIntoView({block:"start",behavior:"smooth"});return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
-  if(a==="done"){withMe(function(who){var tk=byId(S.tasks,id);dispatch({t:"log",log:{id:rid(),date:TODAY,task:id,taskName:tk.name,by:who,memo:""}});if(tk.flagDate)dispatch({t:"task",task:{id:id,flagDate:"",flagBy:"",flagMemo:""}})});return}
+  if(a==="done"){withMe(function(who){var tk=byId(S.tasks,id);dispatch({t:"log",log:{id:rid(),date:TODAY,task:id,taskName:tk.name,by:who,memo:""}});if(tk.flagDate||tk.snooze)dispatch({t:"task",task:{id:id,flagDate:"",flagBy:"",flagMemo:"",snooze:""}})});return}
   if(a==="unlog"){if(t.dataset.confirm&&armed!==id){arm(id);render();return}armed=null;dispatch({t:"unlog",id:id});return}
   if(a==="memo"){var lg=byId(S.logs,id);if(!lg)return;ask({title:"메모",text:lg.taskName||"",input:true,value:lg.memo||"",placeholder:"예: 카드 20장, 물 반만 갈았음",ok:"저장"}).then(function(mm){if(mm==null)return;dispatch({t:"log",log:{id:id,memo:mm.trim()}})});return}
   if(a==="flag"){var tf=byId(S.tasks,id);if(!tf)return;
     if(tf.flagDate){dispatch({t:"task",task:{id:id,flagDate:"",flagBy:"",flagMemo:""}});return}
-    withMe(function(who){ask({title:tf.name+" · 필요해요",text:"왜 필요해 보이나요? (선택, 비워도 돼요)",input:true,ok:"표시"}).then(function(note){if(note==null)return;dispatch({t:"task",task:{id:id,flagDate:TODAY,flagBy:who,flagMemo:note.trim()}})})});return}
+    withMe(function(who){ask({title:tf.name+" · 필요해요",text:"왜 필요해 보이나요? (선택, 비워도 돼요)",input:true,ok:"표시"}).then(function(note){if(note==null)return;dispatch({t:"task",task:{id:id,flagDate:TODAY,flagBy:who,flagMemo:note.trim(),snooze:""}})})});return}
+  if(a==="snooze"){dispatch({t:"task",task:{id:id,snooze:addDays(TODAY,7)}});return}
   if(a==="addlog"){var sel=document.getElementById("addlog");if(!sel)return;var tk2=byId(S.tasks,sel.value);if(!tk2)return;withMe(function(who){dispatch({t:"log",log:{id:rid(),date:t.dataset.k,task:tk2.id,taskName:tk2.name,by:who,memo:""}})});return}
   if(a==="checkall"){var L=checkLabels(t.dataset.k).filter(function(l){return !checkOf(t.dataset.d,t.dataset.k,l)});withMe(function(who){dispatch({t:"check",date:t.dataset.d,kind:t.dataset.k,labels:L,on:true,by:who,time:hm()})});return}
   if(a==="qty"){var it=byId(S.items,id);if(!it)return;var q=Math.max(0,(num(it.qty)||0)+(+t.dataset.d));dispatch({t:"item",item:{id:id,qty:String(q)}});return}
@@ -685,7 +710,7 @@ app.addEventListener("click",function(e){
   if(a==="unitem"||a==="untask"||a==="unissue"){if(armed!==id){arm(id);render();return}armed=null;dispatch({t:a,id:id});return}
   if(a==="resolve"){withMe(function(who){ask({title:"해결됨으로 표시",text:"어떻게 해결했나요? (선택)",input:true,ok:"해결됨"}).then(function(n){if(n==null)return;dispatch({t:"issue",issue:{id:id,status:"해결",doneDate:TODAY,doneBy:who,doneNote:n.trim()}})})});return}
   if(a==="reopen"){dispatch({t:"issue",issue:{id:id,status:"진행중",doneDate:"",doneBy:"",doneNote:""}});return}
-  if(a==="addtask"){var nid=rid();dispatch({t:"task",task:{id:nid,name:"새 업무",type:"필요시",every:"",warn:"",guide:"",link:"",flagDate:"",flagBy:"",flagMemo:""}});setTimeout(function(){var el=document.getElementById("tn-"+nid);if(el){el.focus();el.select();el.scrollIntoView({block:"center"})}},0);return}
+  if(a==="addtask"){var nid=rid();dispatch({t:"task",task:{id:nid,name:"새 업무",type:"필요시",every:"",warn:"",guide:"",link:"",flagDate:"",flagBy:"",flagMemo:"",snooze:""}});setTimeout(function(){var el=document.getElementById("tn-"+nid);if(el){el.focus();el.select();el.scrollIntoView({block:"center"})}},0);return}
 });
 app.addEventListener("change",function(e){
   var t=e.target,a=t.dataset&&t.dataset.act;if(!a)return;
@@ -697,7 +722,10 @@ app.addEventListener("change",function(e){
     return;
   }
   if(a==="itemf"){var v=t.value.trim();if(t.dataset.f==="name"&&!v){render();return}var o={id:t.dataset.id};o[t.dataset.f]=v;dispatch({t:"item",item:o});return}
-  if(a==="taskf"){var v2=t.value.trim();if(t.dataset.f==="name"&&!v2){render();return}var o2={id:t.dataset.id};o2[t.dataset.f]=v2;if(t.dataset.f==="type"&&v2==="주기"){var tk=byId(S.tasks,t.dataset.id);if(tk&&!num(tk.every))o2.every="7"}dispatch({t:"task",task:o2});return}
+  if(a==="taskf"){var v2=t.value.trim();if(t.dataset.f==="name"&&!v2){render();return}var o2={id:t.dataset.id};o2[t.dataset.f]=v2;if(t.dataset.f==="type"){var tk=byId(S.tasks,t.dataset.id);
+      /* keep the interval when switching kinds: 주기(일) ↔ 제안(일) */
+      if(tk&&v2==="주기"&&!num(tk.every))o2.every=num(tk.warn)?tk.warn:"7";
+      if(tk&&v2==="필요시"&&!num(tk.warn)&&num(tk.every))o2.warn=tk.every}dispatch({t:"task",task:o2});return}
   if(a==="checklist"){var seen={};var labels=t.value.split("\n").map(function(x){return x.trim()}).filter(function(x){if(!x||seen[x])return false;seen[x]=1;return true});dispatch({t:"checklist",kind:t.dataset.k,labels:labels});return}
 });
 app.addEventListener("submit",function(e){
