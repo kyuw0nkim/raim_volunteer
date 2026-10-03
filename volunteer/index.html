@@ -418,12 +418,12 @@ function parseNames(text){return parseEntries(text).map(function(e){return e.nam
 function boxes(k){
   var rog=isRogDay(k),we=isWeekend(k),b=[];
   if(we)b.push({id:"qe-am",slot:"오전",rog:false,we:false,label:"전시안내 오전"},{id:"qe-pm",slot:"오후",rog:false,we:false,label:"전시안내 오후"},
-    {id:"qe-am-w",slot:"오전",rog:false,we:true,label:"주말 오전"},{id:"qe-pm-w",slot:"오후",rog:false,we:true,label:"주말 오후"});
+    {id:"qe-am-w",slot:"오전",rog:true,we:true,label:"주말 오전"},{id:"qe-pm-w",slot:"오후",rog:true,we:true,label:"주말 오후"});
   else b.push({id:"qe-am",slot:"오전",rog:false,we:false,label:rog?"오전 (일반)":"오전"},{id:"qe-pm",slot:"오후",rog:false,we:false,label:rog?"오후 (일반)":"오후"});
-  if(rog)b.push({id:"qe-am-r",slot:"오전",rog:true,we:false,label:"로공방 오전"},{id:"qe-pm-r",slot:"오후",rog:true,we:false,label:"로공방 오후"});
+  if(rog&&!we)b.push({id:"qe-am-r",slot:"오전",rog:true,we:false,label:"로공방 오전"},{id:"qe-pm-r",slot:"오후",rog:true,we:false,label:"로공방 오후"});
   return b;
 }
-function boxVols(k,b){var rog=isRogDay(k),we=isWeekend(k);return peek(k).vols.filter(function(v){return v.slot===b.slot&&(!rog||!!v.rog===b.rog)&&(!we||!!v.we===b.we)})}
+function boxVols(k,b){var rog=isRogDay(k),we=isWeekend(k);return peek(k).vols.filter(function(v){return v.slot===b.slot&&(we?!!v.we===b.we:(!rog||!!v.rog===b.rog))})}
 function applyBoxes(k){
   var d=ensure(k),added=0,removed=0;
   boxes(k).forEach(function(b){
@@ -450,7 +450,7 @@ function qeHTML(k){
   var h='<div class="qe"><div class="qe-h"><h3>1365 명단 입력</h3><p>1365에서 복사해 붙여넣기만 하세요. 줄바꿈·쉼표·표 복사 모두 되고, 전화번호가 같이 있으면 함께 저장돼요. 배치는 자동이에요.</p></div><div class="qe-grid">';
   boxes(k).forEach(function(b){
     var names=boxVols(k,b).map(function(v){return v.name}),dr=QD[k]&&QD[k][b.id],txt=dr!=null?dr:names.join("\n");
-    h+='<div class="qe-box'+(b.rog?" rog":"")+(b.we?" we":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+parseNames(txt).length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(txt)+'</textarea></div>';
+    h+='<div class="qe-box'+(b.rog&&!b.we?" rog":"")+(b.we?" we":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+parseNames(txt).length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(txt)+'</textarea></div>';
   });
   h+='</div><div class="qe-act"><button type="button" class="btn primary big" data-act="qeapply">'+(d.vols.length?"명단 다시 반영":"명단 반영")+'</button>';
   h+='<span class="muted'+(qeDirty(k)?" dirty":"")+'" id="qe-msg">'+qeMsg(k)+'</span></div></div>';
