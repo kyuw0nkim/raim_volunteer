@@ -140,6 +140,7 @@ button{cursor:pointer}
 .f-name input.nm{flex:1 1 100%}
 .badge{font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;background:var(--accent-soft);color:var(--accent-press);white-space:nowrap}
 .badge.b-lime{background:var(--peri-soft);color:var(--peri-ink)}
+.badge.b-we{background:var(--accent-soft);color:var(--accent-press)}
 .badge.b-day{background:var(--canvas-cream);color:var(--sand-ink)}
 .f-place{display:flex;gap:6px;align-items:center;min-width:0}
 .pin{border:1px solid var(--line);background:var(--surface);border-radius:6px;font-size:11.5px;padding:4px 7px;white-space:nowrap;color:var(--muted)}
@@ -161,7 +162,7 @@ button{cursor:pointer}
 .qe-box{display:grid;gap:4px}
 .qe-box label{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600}
 .qe-box label span{font-weight:450;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
-.qe-box.rog label{color:var(--accent)}
+.qe-box.rog label,.qe-box.we label{color:var(--accent)}
 .qe textarea{min-height:92px;font-size:14px;line-height:1.6;background:var(--surface)}
 .qe-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .btn.big{padding:9px 16px;font-size:14px}
@@ -415,11 +416,14 @@ function parseEntries(text){
 }
 function parseNames(text){return parseEntries(text).map(function(e){return e.name})}
 function boxes(k){
-  var rog=isRogDay(k),b=[{id:"qe-am",slot:"오전",rog:false,label:rog?"오전 (일반)":"오전"},{id:"qe-pm",slot:"오후",rog:false,label:rog?"오후 (일반)":"오후"}];
-  if(rog)b.push({id:"qe-am-r",slot:"오전",rog:true,label:"로공방 오전"},{id:"qe-pm-r",slot:"오후",rog:true,label:"로공방 오후"});
+  var rog=isRogDay(k),we=isWeekend(k),b=[];
+  if(we)b.push({id:"qe-am",slot:"오전",rog:false,we:false,label:"전시안내 오전"},{id:"qe-pm",slot:"오후",rog:false,we:false,label:"전시안내 오후"},
+    {id:"qe-am-w",slot:"오전",rog:true,we:true,label:"주말 오전"},{id:"qe-pm-w",slot:"오후",rog:true,we:true,label:"주말 오후"});
+  else b.push({id:"qe-am",slot:"오전",rog:false,we:false,label:rog?"오전 (일반)":"오전"},{id:"qe-pm",slot:"오후",rog:false,we:false,label:rog?"오후 (일반)":"오후"});
+  if(rog&&!we)b.push({id:"qe-am-r",slot:"오전",rog:true,we:false,label:"로공방 오전"},{id:"qe-pm-r",slot:"오후",rog:true,we:false,label:"로공방 오후"});
   return b;
 }
-function boxVols(k,b){var rog=isRogDay(k);return peek(k).vols.filter(function(v){return v.slot===b.slot&&(!rog||!!v.rog===b.rog)})}
+function boxVols(k,b){var rog=isRogDay(k),we=isWeekend(k);return peek(k).vols.filter(function(v){return v.slot===b.slot&&(we?!!v.we===b.we:(!rog||!!v.rog===b.rog))})}
 function applyBoxes(k){
   var d=ensure(k),added=0,removed=0;
   boxes(k).forEach(function(b){
@@ -427,7 +431,7 @@ function applyBoxes(k){
     var ents=parseEntries(el.value),cur=boxVols(k,b),used=[];
     ents.forEach(function(en){
       var v=cur.filter(function(x){return x.name===en.name&&used.indexOf(x)<0})[0];
-      if(!v){v={id:rid(),name:en.name,phone:en.phone,slot:b.slot,place:"-",rog:b.rog,locked:false,attend:null,entered:false,memo:""};d.vols.push(v);added++}
+      if(!v){v={id:rid(),name:en.name,phone:en.phone,slot:b.slot,place:"-",rog:b.rog,we:b.we,locked:false,attend:null,entered:false,memo:""};d.vols.push(v);added++}
       else if(en.phone)v.phone=en.phone;
       used.push(v);
     });
@@ -446,7 +450,7 @@ function qeHTML(k){
   var h='<div class="qe"><div class="qe-h"><h3>1365 명단 입력</h3><p>1365에서 복사해 붙여넣기만 하세요. 줄바꿈·쉼표·표 복사 모두 되고, 전화번호가 같이 있으면 함께 저장돼요. 배치는 자동이에요.</p></div><div class="qe-grid">';
   boxes(k).forEach(function(b){
     var names=boxVols(k,b).map(function(v){return v.name}),dr=QD[k]&&QD[k][b.id],txt=dr!=null?dr:names.join("\n");
-    h+='<div class="qe-box'+(b.rog?" rog":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+parseNames(txt).length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(txt)+'</textarea></div>';
+    h+='<div class="qe-box'+(b.rog&&!b.we?" rog":"")+(b.we?" we":"")+'"><label for="'+b.id+'">'+b.label+'<span id="'+b.id+'-n">'+parseNames(txt).length+'명</span></label><textarea id="'+b.id+'" data-qe="1" placeholder="이름 붙여넣기">'+esc(txt)+'</textarea></div>';
   });
   h+='</div><div class="qe-act"><button type="button" class="btn primary big" data-act="qeapply">'+(d.vols.length?"명단 다시 반영":"명단 반영")+'</button>';
   h+='<span class="muted'+(qeDirty(k)?" dirty":"")+'" id="qe-msg">'+qeMsg(k)+'</span></div></div>';
@@ -665,7 +669,7 @@ function notice(k){
     PORDER.forEach(function(p){
       var g=vs.filter(function(v){return v.place===p});
       if(!g.length)return;
-      var names=g.map(function(v){return v.name+(isLime(v.name)?"(라메)":"")+(allDay.indexOf(v.name)>=0?"(종일)":"")}).join("/");
+      var names=g.map(function(v){return v.name+(isLime(v.name)?"(라메)":"")+(v.we?"(주말)":"")+(allDay.indexOf(v.name)>=0?"(종일)":"")}).join("/");
       var memo=g.filter(function(v){return v.memo}).map(function(v){return v.memo}).join(", ");
       out.push("- "+names+": "+PLACES[p]+(memo?" (*"+memo+")":""));
     });
@@ -878,7 +882,7 @@ function detailHTML(){
     vs.forEach(function(v){
       var open=UI.openRow===v.id;
       h+='<div class="row'+(v.attend==="x"?" absent":"")+(v.attend==="o"?" att-o":"")+(open?" open":"")+'">';
-      h+='<div class="f-name">'+(UI.editName===v.id?'<input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">':'<button type="button" class="nmtxt" data-act="editname" data-id="'+v.id+'" title="눌러서 이름 고치기">'+esc(v.name)+'</button>')+(isLime(v.name)?'<span class="badge b-lime">라메</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge b-day">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+(v.memo?'<span class="memo-s">'+esc(v.memo)+'</span>':'')+'</div>';
+      h+='<div class="f-name">'+(UI.editName===v.id?'<input type="text" class="nm" id="nm-'+v.id+'" data-act="name" data-id="'+v.id+'" value="'+esc(v.name)+'" aria-label="이름">':'<button type="button" class="nmtxt" data-act="editname" data-id="'+v.id+'" title="눌러서 이름 고치기">'+esc(v.name)+'</button>')+(isLime(v.name)?'<span class="badge b-lime">라메</span>':'')+(v.we?'<span class="badge b-we">주말</span>':'')+(allDay.indexOf(v.name)>=0?'<span class="badge b-day">종일</span>':'')+(v.phone?'<span class="ph mono">'+esc(v.phone)+'</span>':'')+(v.memo?'<span class="memo-s">'+esc(v.memo)+'</span>':'')+'</div>';
       h+='<div class="f-place"><select id="pl-'+v.id+'" data-act="place" data-id="'+v.id+'" aria-label="배치">'+PORDER.map(function(p){return '<option value="'+p+'"'+(v.place===p?" selected":"")+' title="'+PLACES[p]+'">'+PSHORT[p]+'</option>'}).join("")+'</select><button type="button" class="pin'+(v.locked?" on":"")+'" data-act="pin" data-id="'+v.id+'" title="'+(v.locked?"고정됨: 누르면 자동 배치로 돌아가요":"자동 배치 중: 배치를 바꾸면 고정돼요")+'">'+(v.locked?"고정":"자동")+'</button><button type="button" class="more" data-act="more" data-id="'+v.id+'" aria-expanded="'+open+'">'+(open?"접기":"더보기")+'</button></div>';
       h+='<label class="rogtg f-rog'+(v.rog?" on":"")+(rog?"":" dim")+'" title="로공방 모집으로 신청한 봉사자"><input type="checkbox" data-act="rog" data-id="'+v.id+'"'+(v.rog?" checked":"")+'> 로공방</label>';
       h+='<span class="seg f-att" role="group" aria-label="출석"><button type="button" class="o'+(v.attend==="o"?" on":"")+'" data-act="att" data-v="o" data-id="'+v.id+'" aria-pressed="'+(v.attend==="o")+'">출석</button><button type="button" class="x'+(v.attend==="x"?" on":"")+'" data-act="att" data-v="x" data-id="'+v.id+'" aria-pressed="'+(v.attend==="x")+'">결석</button></span>';
