@@ -18,6 +18,7 @@ const 보드CONFIG = {
   날짜탭명: '보드_날짜',            // 날짜별 명단 확인 / 휴관 / 공지 문구
   입력탭명: '보드_활동기록입력',     // 활동기록부 변환(①②)이 읽는 탭
   기록부반영시작일: '20261001',      // 이 날짜부터 입력 탭에 넣습니다 (9월은 기존 탭과 겹치지 않게). 비우면 전체.
+  원본탭명: '원본',                  // 월말에 붙여넣는 1365 명단. 보드에서 결석한 사람은 '미승인' 칸에 1을 표시합니다
   알림받을메일: '',                  // 비우면 스크립트 소유자 메일 (여러 명이면 쉼표로)
   보드주소: '',                      // GitHub Pages 주소 (알림 메일에 링크로 들어감). 예: https://kyuw0nkim.github.io/raim_volunteer/
   주말알림요일: ScriptApp.WeekDay.FRIDAY,
@@ -384,6 +385,9 @@ function 보드_저장_(state) {
     .map(r => [r[3], r[4], r[1], r[2], r[8] === '결석' ? '1' : '', r[5], r[8]]);
   보드_덮어쓰기_(보드_시트_(보드CONFIG.입력탭명, 보드_입력헤더), 보드_입력헤더, inputRows);
 
+  // 원본 탭이 있으면 결석 표시를 미승인 칸에도 맞춰 둡니다 (실패해도 보드 저장은 그대로)
+  try { 보드_원본미승인_(volRows); } catch (err) {}
+
   const settings = state.settings || {};
   보드_덮어쓰기_(보드_시트_(보드_설정탭명, 보드_설정헤더), 보드_설정헤더,
     Object.keys(settings).sort().map(k => [k, JSON.stringify(settings[k])]));
@@ -425,6 +429,127 @@ function 보드_라메명단_() {
     return names;
   }
   return [];
+}
+
+/* =====================================================
+ * 원본 탭 미승인 표시 (월말 1365 명단)
+ * ===================================================== */
+
+/**
+ * '원본' 탭(1365에서 받은 명단, 공고마다 '순번 | 봉사자성명 | … | 활동일자 | 시작시간 …' 머리줄이 반복됨)에서
+ * 봉사자성명 + 활동일자 + 시작시간(12시 전 = 오전, 이후 = 오후)이 보드와 같은 줄을 찾아
+ * 보드에서 결석이면 '미승인' 칸에 1, 출석·미표시면 비웁니다.
+ * - '미승인' 머리글이 없으면 머리줄 마지막 칸 다음 열에 만듭니다.
+ * - 같은 날·같은 시간대에 이름이 같은 기록이 둘 이상이면 휴대폰 번호로 고릅니다.
+ * - 보드에 없는 줄은 손대지 않습니다 (손으로 넣은 미승인 그대로).
+ * volRows: '보드_기록' 탭과 같은 모양의 줄들
+ */
+function 보드_원본미승인_(volRows) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(보드CONFIG.원본탭명);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const layout = 보드_원본구조_(sheet);
+  if (!layout) return null;
+  const { values, flagCol, headers } = layout;
+
+  const nameKey = n => String(n || '').replace(/\s+/g, '').toLowerCase();
+  const digits = p => String(p || '').replace(/[^0-9]/g, '');
+  const board = {};
+  volRows.forEach(r => {
+    const k = 보드_키_(r[1]);
+    const name = nameKey(r[3]);
+    if (!k || !name) return;
+    const key = k + '|' + (r[2] === '오후' ? '오후' : '오전') + '|' + name;
+    (board[key] = board[key] || []).push({ name: String(r[3]).trim(), k, slot: r[2], phone: digits(r[4]), absent: r[8] === '결석', used: false });
+  });
+
+  const changes = [];   // [행 번호(0부터), 새 값]
+  const cell = row => String((values[row] || [])[flagCol] == null ? '' : values[row][flagCol]);
+  let cols = null, minK = '', maxK = '', marked = 0, notOnBoard = 0;
+  for (let row = 0; row < values.length; row += 1) {
+    if (headers[row]) {
+      cols = headers[row];
+      if (cell(row) !== '미승인') changes.push([row, '미승인']);
+      continue;
+    }
+    if (!cols) continue;
+    const r = values[row];
+    const k = 보드_키_(r[cols.date]);
+    const name = nameKey(r[cols.name]);
+    if (!k || !name) continue;
+    if (!minK || k < minK) minK = k;
+    if (!maxK || k > maxK) maxK = k;
+    const hour = parseInt(String(r[cols.time] == null ? '' : r[cols.time]).replace(/[^0-9:]/g, ''), 10);
+    const slot = hour >= 12 ? '오후' : '오전';
+    const list = board[k + '|' + slot + '|' + name];
+    if (!list) { notOnBoard += 1; continue; }
+    const phone = cols.phone >= 0 ? digits(r[cols.phone]) : '';
+    const free = list.filter(x => !x.used);
+    const hit = (phone && free.find(x => x.phone === phone)) || free[0] || list[0];
+    hit.used = true;
+    const want = hit.absent ? '1' : '';
+    if (hit.absent) marked += 1;
+    if (cell(row) !== want) changes.push([row, want]);
+  }
+
+  changes.forEach(([row, v]) => sheet.getRange(row + 1, flagCol + 1).setValue(v === '1' ? 1 : v));
+
+  // 보드에는 결석인데 원본 명단(같은 기간)에 없는 사람
+  const missing = [];
+  Object.keys(board).forEach(key => board[key].forEach(x => {
+    if (x.absent && !x.used && x.k >= minK && x.k <= maxK) missing.push(x.name + ' ' + x.k.slice(4, 6) + '/' + x.k.slice(6) + ' ' + x.slot);
+  }));
+  return { marked, changed: changes.length, notOnBoard, missing };
+}
+
+/** 원본 탭의 머리줄 위치와 열, 미승인 열(0부터)을 찾습니다. 머리줄이 하나도 없으면 null */
+function 보드_원본구조_(sheet) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headers = {};
+  let flagCol = -1, lastCol = -1;
+  values.forEach((r, row) => {
+    const h = r.map(v => String(v).replace(/\s/g, ''));
+    const name = h.indexOf('봉사자성명'), date = h.indexOf('활동일자'), time = h.indexOf('시작시간');
+    if (name < 0 || date < 0 || time < 0) return;
+    headers[row] = { name, date, time, phone: h.indexOf('휴대폰') };
+    const f = h.indexOf('미승인');
+    if (f >= 0 && flagCol < 0) flagCol = f;
+    h.forEach((v, c) => { if (v && v !== '미승인' && c > lastCol) lastCol = c; });
+  });
+  if (lastCol < 0) return null;
+  return { values, headers, flagCol: flagCol >= 0 ? flagCol : lastCol + 1 };
+}
+
+function 보드_원본결과문구_(res) {
+  if (!res) return "'" + 보드CONFIG.원본탭명 + "' 탭에서 봉사자성명·활동일자·시작시간 머리줄을 찾지 못했어요.";
+  let msg = '미승인 ' + res.marked + '명 표시';
+  if (res.notOnBoard) msg += ' · 보드에 없는 줄 ' + res.notOnBoard + '개 (그대로 둠)';
+  if (res.missing.length) msg += ' · 보드엔 결석인데 원본에 없음: ' + res.missing.join(', ');
+  return msg;
+}
+
+/** 편집기에서 직접 실행해도 됩니다. 보드_기록 탭의 결석으로 원본 탭 미승인 칸을 채웁니다. */
+function 보드_원본미승인표시() {
+  const rows = 보드_시트_(보드CONFIG.기록탭명, 보드_기록헤더).getDataRange().getDisplayValues().slice(1);
+  const msg = 보드_원본결과문구_(보드_원본미승인_(rows));
+  Logger.log(msg);
+  try { SpreadsheetApp.getActiveSpreadsheet().toast(msg, '미승인 표시', 10); } catch (err) {}
+}
+
+/** 원본 탭을 고치거나 붙여넣으면 자동으로 실행됩니다 (보드_알림설치가 예약). 미승인 칸만 손으로 고친 건 건드리지 않아요. */
+function 보드_원본바뀜(e) {
+  const range = e && e.range;
+  if (!range || range.getSheet().getName() !== 보드CONFIG.원본탭명) return;
+  if (range.getNumColumns() === 1) {
+    const layout = 보드_원본구조_(range.getSheet());
+    if (layout && layout.flagCol + 1 === range.getColumn()) return;
+  }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return;
+  try {
+    보드_원본미승인표시();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /* =====================================================
@@ -518,7 +643,7 @@ function 보드_코드만들기_(key, label, path) {
 }
 
 function 보드_알림설치() {
-  const handlers = ['보드_알림_주말', '보드_알림_저녁', '아뜰리에_알림_아침'];
+  const handlers = ['보드_알림_주말', '보드_알림_저녁', '아뜰리에_알림_아침', '보드_원본바뀜'];
   ScriptApp.getProjectTriggers().forEach(t => {
     if (handlers.includes(t.getHandlerFunction())) ScriptApp.deleteTrigger(t);
   });
@@ -528,6 +653,8 @@ function 보드_알림설치() {
     .atHour(보드CONFIG.저녁알림시).create();
   ScriptApp.newTrigger('아뜰리에_알림_아침').timeBased().everyDays(1)
     .atHour(보드CONFIG.아뜰리에알림시).create();
+  // 원본 탭에 명단을 붙여넣으면 미승인 칸을 채웁니다
+  ScriptApp.newTrigger('보드_원본바뀜').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onEdit().create();
 }
 
 function 보드_오늘_() {
