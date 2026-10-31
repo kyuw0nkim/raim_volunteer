@@ -226,6 +226,22 @@ textarea:disabled{background:var(--sunk);color:var(--muted)}
 .del{border:0;background:none;color:var(--muted);font-size:12px;padding:4px 6px;border-radius:6px;white-space:nowrap}
 .del.arm{color:var(--surface);background:var(--danger)}
 .none{color:var(--muted);font-size:13px;padding:4px 2px}
+/* 배치 요청 (다른 팀이 봉사자 배치를 요청한 날) */
+.pill.req{background:var(--peri-soft);color:var(--peri-ink);font-weight:600}
+.cell .rq{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;font-weight:600;line-height:1.35;border-radius:4px;padding:0 3px;margin:1px 0;background:var(--peri-soft);color:var(--peri-ink)}
+.reqs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.reqs label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--surface);color:var(--ink)}
+.reqs label.on{border-color:var(--peri-ink);background:var(--peri-soft);color:var(--peri-ink);font-weight:600}
+.reqs input{margin:0;accent-color:var(--peri-ink);width:15px;height:15px}
+.rqedit{display:grid;grid-template-columns:minmax(120px,200px) minmax(0,1fr);gap:8px;align-items:start;background:var(--sunk);border-radius:8px;padding:10px}
+.rqedit input,.rqedit textarea{width:100%;min-width:0;border:1px solid var(--line-input);background:var(--surface);border-radius:6px;padding:6px 8px;font-size:13px}
+.rqedit input{font-weight:600}
+.rqedit textarea{min-height:44px}
+.rqfoot{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.rqfoot .chip{background:var(--surface)}
+.rqfoot .chip.past{opacity:.55}
+.rqfoot .del{margin-left:auto}
+@media (max-width:620px){.rqedit{grid-template-columns:1fr}}
 
 .add{display:grid;grid-template-columns:minmax(140px,1.6fr) auto auto minmax(100px,1.2fr) auto;gap:8px;align-items:center;border:1px dashed var(--line);border-radius:8px;padding:10px}
 @media (max-width:760px){.add{grid-template-columns:1fr 1fr}.add .a-name,.add .a-memo{grid-column:1/-1}}
@@ -330,7 +346,7 @@ var PSHORT={"1F":"1층 전시안내","2F":"2층 교육장","3F":"3층 상주","4
 var WD=["일","월","화","수","목","금","토"];
 var SLOTS=["오전","오후"];
 
-var DEF={lime:[],rogDays:[0,6],prioRog:["4F","1F","3F","2F"],prioNo:["1F","3F","2F"],cap:{"1F":null,"2F":2,"3F":1,"4F":1}};
+var DEF={lime:[],rogDays:[0,6],prioRog:["4F","1F","3F","2F"],prioNo:["1F","3F","2F"],cap:{"1F":null,"2F":2,"3F":1,"4F":1},reqs:[]};
 var S,ST;
 function initState(s){
   S=s||{};if(!S.days)S.days={};if(!S.settings)S.settings={};
@@ -471,6 +487,39 @@ function peek(k){return S.days[k]||{checked:false,note:"",vols:[]}}
 function ensure(k){if(!S.days[k])S.days[k]={checked:false,chk:{},note:"",vols:[]};return S.days[k]}
 function isClosed(k){var d=S.days[k];if(d&&typeof d.closed==="boolean")return d.closed;return dateOf(k).getDay()===1}
 function isWeekend(k){var w=dateOf(k).getDay();return w===0||w===6}
+
+/* ---------- 배치 요청: 다른 팀(예: 유아교육)이 봉사자 배치를 요청한 날 ----------
+   설정의 reqs = [{id, name, dates:["20261031", …]}] (보드_설정 탭에 같이 저장) */
+function reqs(){return ST.reqs||(ST.reqs=[])}
+function reqById(id){return reqs().filter(function(r){return r.id===id})[0]||null}
+function reqsOn(k){return reqs().filter(function(r){return (r.dates||[]).indexOf(k)>=0})}
+function reqName(r){return String(r.name||"").trim()}
+function reqLabel(r){return reqName(r)?reqName(r)+" 배치 요청":"배치 요청"}
+/* 연도를 안 적은 날짜는 오늘에서 가장 가까운 해로 */
+function nearYear(m,d){
+  var t=dateOf(TODAY),best=null,bd=Infinity;
+  [-1,0,1].forEach(function(o){var y=t.getFullYear()+o,x=new Date(y,m-1,d);if(x.getMonth()!==m-1)return;var df=Math.abs(x-t);if(df<bd){bd=df;best=y}});
+  return best;
+}
+/* "10/31, 11/1, 11/7, 8, 14" · "11월 7일, 8일" · "2026-11-07" 모두 됨. 월을 빼면 앞 날짜와 같은 달 */
+function parseDates(text){
+  var out=[],lastY=null,lastM=null,m;
+  var re=/(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})|\b(\d{1,2})\s*(?:[/.]|월)\s*(\d{1,2})|\b(\d{1,2})\b/g;
+  text=String(text||"");
+  while((m=re.exec(text))){
+    var y,mo,d;
+    if(m[1]){y=+m[1];mo=+m[2];d=+m[3]}
+    else if(m[4]){mo=+m[4];d=+m[5];y=nearYear(mo,d)}
+    else{if(lastM==null)continue;y=lastY;mo=lastM;d=+m[6]}
+    if(!y||mo<1||mo>12||d<1)continue;
+    var x=new Date(y,mo-1,d);if(x.getMonth()!==mo-1)continue;
+    lastY=y;lastM=mo;var k=keyOf(x);if(out.indexOf(k)<0)out.push(k);
+  }
+  return out.sort();
+}
+/* 다시 읽어도 같은 날짜가 되게: 가장 가까운 해가 아니면 연도까지 적음 */
+function fmtDate(k){var d=dateOf(k),y=d.getFullYear(),m=d.getMonth()+1,dd=d.getDate();return (nearYear(m,dd)===y?"":y+"/")+m+"/"+dd}
+function fmtDates(L){return (L||[]).slice().sort().map(fmtDate).join(", ")}
 
 function status(k){
   if(isClosed(k))return "closed";
@@ -698,7 +747,7 @@ function todo(){
 }
 
 /* ---------- render ---------- */
-var armed=null;
+var armed=null,armedReq=null;
 var CONFLICTMSG='<div class="banner">다른 기기에서 계속 동시에 저장하고 있어서 합치지 못했어요. ‘지금 저장’으로 다시 시도하거나, ‘최신 내용 불러오기’로 시트 내용을 다시 열 수 있어요 (그러면 이 기기에서 방금 바꾼 내용은 빠져요).</div>';
 /* re-rendering while a mouse/finger is down swallows the click (the element under it is replaced),
    e.g. typing a memo and then pressing 출석. So wait until the click has gone through. */
@@ -733,9 +782,10 @@ function paint(){
   var h='';
   if(UI.view==="settings"){
     h+='<a class="crumb" href="../">← RAIM 업무 대시보드</a>';
-    h+='<header class="top"><h1>설정<small>배치 규칙 · 라메 명단 · 활동기록부</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="board">← 보드로</button></div></header>';
+    h+='<header class="top"><h1>설정<small>배치 규칙 · 배치 요청 · 라메 명단 · 활동기록부</small></h1><div class="top-r">'+saveHTML()+'<button type="button" class="btn" data-act="view" data-v="board">← 보드로</button></div></header>';
     if(saveState==="conflict")h+=CONFLICTMSG;
     h+=rulesHTML();
+    h+=reqHTML();
     h+=reportHTML();
     h+='<div class="setfoot"><span>웹앱 주소·접속 코드를 바꾸려면</span><button type="button" class="btn" data-act="copylink" data-board="volunteer">자원봉사 전용 링크 복사</button><button type="button" class="btn" data-act="setup">연결 설정</button></div>';
     document.getElementById("app").innerHTML=h;return;
@@ -777,6 +827,16 @@ function rulesHTML(){
   h+='<h4>로공방 운영 요일</h4><div class="wdays">'+WD.map(function(w,i){var on=ST.rogDays.indexOf(i)>=0;return '<label class="'+(on?"on":"")+'"><input type="checkbox" data-act="rogday" data-w="'+i+'"'+(on?" checked":"")+'> '+w+'</label>'}).join("")+'</div>';
   h+='<p>로공방 모집 봉사자는 로공방 운영일에 항상 로공방으로 가요. 날짜별로 운영 여부를 따로 바꿀 수도 있어요. 규칙을 바꾸면 오늘 이후 자동 배치된 사람에게 바로 반영돼요.</p></div>';
   return h+'</div></section>';
+}
+function reqHTML(){
+  var h='<section class="report" aria-label="배치 요청"><h4>배치 요청</h4><p>다른 팀에서 봉사자 배치를 요청한 날을 적어 두면 달력과 그 날 화면에 ‘유아교육 배치 요청’처럼 표시돼요. 날짜는 쉼표로 적고, 월을 빼면 앞 날짜와 같은 달이에요 (예: 10/31, 11/1, 11/7, 8, 14). 그 날 화면에서 하루씩 켜고 끌 수도 있어요.</p>';
+  reqs().forEach(function(r){
+    var L=(r.dates||[]).slice().sort();
+    h+='<div class="rqedit"><input type="text" id="rqn-'+r.id+'" data-act="reqname" data-id="'+r.id+'" value="'+esc(r.name||"")+'" placeholder="요청한 곳 (예: 유아교육)" aria-label="요청한 곳"><textarea id="rqd-'+r.id+'" data-act="reqdates" data-id="'+r.id+'" placeholder="날짜 (예: 10/31, 11/1, 11/7, 8)" aria-label="'+esc(reqLabel(r))+' 날짜">'+esc(fmtDates(L))+'</textarea>';
+    h+='<div class="rqfoot">'+(L.length?L.map(function(k){return '<button type="button" class="chip'+(k<TODAY?" past":"")+'" data-act="go" data-k="'+k+'">'+md(k)+'</button>'}).join(""):'<span>날짜를 적어 주세요</span>');
+    h+='<button type="button" class="del'+(armedReq===r.id?" arm":"")+'" data-act="reqdel" data-id="'+r.id+'">'+(armedReq===r.id?"삭제 확인":"요청 삭제")+'</button></div></div>';
+  });
+  return h+'<div class="report-act"><button type="button" class="btn" data-act="reqadd">+ 배치 요청 추가</button></div></section>';
 }
 /* ---------- monthly report (자원봉사자 활동기록부, .xlsx) ---------- */
 function reportHTML(){
@@ -848,19 +908,20 @@ function calHTML(){
   WD.forEach(function(w,i){h+='<div class="wd'+(i===0?" sun":i===6?" sat":"")+'">'+w+'</div>'});
   for(var i=0;i<first.getDay();i++)h+='<div class="cell pad"></div>';
   for(var dd=1;dd<=last;dd++){
-    var k=y+pad(m+1)+pad(dd),w=dateOf(k).getDay(),st=status(k),n=peek(k).vols.length;
+    var k=y+pad(m+1)+pad(dd),w=dateOf(k).getDay(),st=status(k),n=peek(k).vols.length,rq=reqsOn(k);
     var cls="cell st-"+st+(w===0?" sun":w===6?" sat":"")+(st==="closed"?" closed":"")+(k===TODAY?" today":"")+(k===UI.sel?" sel":"");
     var showDot=st==="check"?(k<=keyOf(addDays(dateOf(TODAY),7))):(st!=="closed"&&st!=="ready");
-    h+='<button type="button" class="'+cls+'" data-act="sel" data-k="'+k+'" aria-label="'+md(k)+' '+STLABEL[st]+'"><span class="n">'+dd+'</span>'+(showDot?'<span class="dot"></span>':'')+'<span class="c">'+(st==="closed"?"휴관":n?n+"명":"")+'</span></button>';
+    h+='<button type="button" class="'+cls+'" data-act="sel" data-k="'+k+'" aria-label="'+md(k)+' '+STLABEL[st]+esc(rq.map(function(r){return ", "+reqLabel(r)}).join(""))+'"><span class="n">'+dd+'</span>'+(showDot?'<span class="dot"></span>':'')+(rq.length?'<span class="rq" title="'+esc(rq.map(reqLabel).join(", "))+'">'+esc(reqName(rq[0])||"요청")+(rq.length>1?" +"+(rq.length-1):"")+'</span>':'')+'<span class="c">'+(st==="closed"?"휴관":n?n+"명":"")+'</span></button>';
   }
-  h+='</div><div class="legend"><span><i style="background:var(--danger)"></i>명단 확인</span><span><i style="background:var(--warn)"></i>출석 표시</span><span><i style="background:var(--accent)"></i>1365 입력</span><span><i style="background:var(--ok)"></i>완료</span></div></div>';
+  h+='</div><div class="legend"><span><i style="background:var(--danger)"></i>명단 확인</span><span><i style="background:var(--warn)"></i>출석 표시</span><span><i style="background:var(--accent)"></i>1365 입력</span><span><i style="background:var(--ok)"></i>완료</span>'+(reqs().length?'<span><i style="background:var(--periwinkle);border-radius:2px"></i>배치 요청</span>':'')+'</div></div>';
   return h;
 }
 
 function detailHTML(){
   var k=UI.sel,d=peek(k),st=status(k),closed=isClosed(k);
-  var h='<div class="detail"><div class="dh"><h2>'+(+k.slice(4,6))+'월 '+(+k.slice(6,8))+'일 ('+WD[dateOf(k).getDay()]+')</h2><span class="pill '+st+'">'+STLABEL[st]+'</span><span class="daynav"><button type="button" data-act="go" data-k="'+keyOf(addDays(dateOf(k),-1))+'" aria-label="전날">‹</button>'+(k!==TODAY?'<button type="button" class="today-btn" data-act="go" data-k="'+TODAY+'">오늘</button>':'')+'<button type="button" data-act="go" data-k="'+keyOf(addDays(dateOf(k),1))+'" aria-label="다음 날">›</button></span></div>';
+  var h='<div class="detail"><div class="dh"><h2>'+(+k.slice(4,6))+'월 '+(+k.slice(6,8))+'일 ('+WD[dateOf(k).getDay()]+')</h2><span class="pill '+st+'">'+STLABEL[st]+'</span>'+reqsOn(k).map(function(r){return '<span class="pill req">'+esc(reqLabel(r))+'</span>'}).join("")+'<span class="daynav"><button type="button" data-act="go" data-k="'+keyOf(addDays(dateOf(k),-1))+'" aria-label="전날">‹</button>'+(k!==TODAY?'<button type="button" class="today-btn" data-act="go" data-k="'+TODAY+'">오늘</button>':'')+'<button type="button" data-act="go" data-k="'+keyOf(addDays(dateOf(k),1))+'" aria-label="다음 날">›</button></span></div>';
   var rog=isRogDay(k),allDay=allDayNames(d);
+  if(reqs().length)h+='<div class="reqs" role="group" aria-label="이 날 배치 요청"><span>배치 요청</span>'+reqs().map(function(r){var on=(r.dates||[]).indexOf(k)>=0;return '<label class="'+(on?"on":"")+'"><input type="checkbox" data-act="reqday" data-id="'+r.id+'"'+(on?" checked":"")+'> '+esc(reqName(r)||"이름 없음")+'</label>'}).join("")+'<button type="button" class="linkbtn" data-act="view" data-v="settings">관리</button></div>';
   h+='<div class="toggles">';
   if(!closed){
     h+='<label class="tg '+(d.checked?"on":"warn")+'"><input type="checkbox" data-act="checked"'+(d.checked?" checked":"")+'> 1365 자원봉사 확인</label>';
@@ -911,8 +972,11 @@ app.addEventListener("toggle",function(e){if(e.target.classList&&e.target.classL
 app.addEventListener("click",function(e){
   var t=e.target.closest("[data-act]");if(!t)return;var a=t.dataset.act;
   if(a!=="del"&&armed){armed=null}
+  if(a!=="reqdel"&&armedReq){armedReq=null}
   if(a==="sel"){go(t.dataset.k);return}
-  if(a==="go"){go(t.dataset.k);return}
+  if(a==="go"){if(UI.view==="settings"){UI.view="board";window.scrollTo(0,0)}go(t.dataset.k);return}
+  if(a==="reqadd"){var nr={id:rid(),name:"",dates:[]};reqs().push(nr);touch();render();var ri0=document.getElementById("rqn-"+nr.id);if(ri0)ri0.focus();return}
+  if(a==="reqdel"){var rqid=t.dataset.id;if(armedReq===rqid){ST.reqs=reqs().filter(function(r){return r.id!==rqid});armedReq=null;touch()}else{armedReq=rqid;setTimeout(function(){if(armedReq===rqid){armedReq=null;render()}},3500)}render();return}
   if(a==="view"){UI.view=t.dataset.v;keepUI();render();window.scrollTo(0,0);return}
   if(a==="report"){var ri=document.getElementById("rym");if(ri&&ri.value)downloadReport(ri.value);return}
   if(a==="mon"){var m=UI.vm+(+t.dataset.d),y=UI.vy;if(m<0){m=11;y--}if(m>11){m=0;y++}UI.vm=m;UI.vy=y;keepUI();render();return}
@@ -938,6 +1002,9 @@ app.addEventListener("change",function(e){
   var t=e.target,a=t.dataset&&t.dataset.act;if(!a)return;
   if(t.tagName==="SELECT"||t.type==="checkbox")ptrDown=false;
   if(a==="rym"){UI.rym=t.value;keepUI();return}
+  if(a==="reqday"){var rq=reqById(t.dataset.id);if(!rq)return;rq.dates=(rq.dates||[]).filter(function(x){return x!==UI.sel});if(t.checked)rq.dates.push(UI.sel);rq.dates.sort();touch();soon();return}
+  if(a==="reqname"){var rn=reqById(t.dataset.id);if(rn){rn.name=t.value.trim();touch()}soon();return}
+  if(a==="reqdates"){var rd=reqById(t.dataset.id);if(rd){rd.dates=parseDates(t.value);touch()}soon();return}
   if(a==="checked"){var dk=ensure(UI.sel);if(!dk.chk)dk.chk={};chkItems(UI.sel).forEach(function(c){dk.chk[c.id]=t.checked});syncChecked(UI.sel);touch();soon();return}
   if(a==="subchk"){var ds=ensure(UI.sel);if(!ds.chk)ds.chk={};ds.chk[t.dataset.c]=t.checked;syncChecked(UI.sel);touch();soon();return}
   if(a==="closed"){ensure(UI.sel).closed=t.checked;touch();soon();return}
